@@ -126,6 +126,31 @@ test("directly opposing tanks damage simultaneously and remain blocked", () => {
   assert.equal(state.board[2][2].hp, 3);
 });
 
+test("a direct killer takes the defeated square and pulls its friendly column forward", () => {
+  let state = createInitialState();
+  state.board[2][2] = unit(1, "p2", "dps", 2);
+  state.board[3][2] = unit(2, "p1", "tank");
+  state.board[4][2] = unit(3, "p1", "healer");
+  state.board[5][2] = unit(4, "p1", "ranged");
+  state.nextUnitId = 5;
+  state = resolveRound(state);
+
+  assert.equal(state.board[2][2].id, 2);
+  assert.equal(state.board[3][2].id, 3);
+  assert.equal(state.board[4][2].id, 4);
+});
+
+test("a ranged kill does not teleport the attacker into the defeated square", () => {
+  let state = createInitialState();
+  state.board[2][3] = unit(1, "p2", "healer", 2);
+  state.board[4][3] = unit(2, "p1", "ranged");
+  state.nextUnitId = 3;
+  state = resolveRound(state);
+
+  assert.equal(state.board[2][3], null);
+  assert.equal(state.board[3][3].id, 2);
+});
+
 test("opposing units contesting the same empty square both hold position", () => {
   let state = createInitialState();
   state.board[4][1] = unit(1, "p1", "healer");
@@ -176,3 +201,4 @@ test("simultaneous fifth breakthroughs produce a draw", () => {
   assert.equal(state.players.p2.score, 5);
   assert.equal(state.winner, "draw");
 });
+
