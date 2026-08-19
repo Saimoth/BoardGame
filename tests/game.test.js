@@ -157,6 +157,8 @@ test("both staged rows deploy for the following round", () => {
   assert.equal(state.players.p2.staging.filter(Boolean).length, 0);
   assert.equal(state.board[5].filter((piece) => piece?.owner === "p1").length, 5);
   assert.equal(state.board[0].filter((piece) => piece?.owner === "p2").length, 5);
+  assert.deepEqual(state.players.p1.played, { tank: 2, dps: 2, ranged: 0, healer: 1 });
+  assert.deepEqual(state.players.p2.played, { tank: 2, dps: 2, ranged: 0, healer: 1 });
 });
 
 test("directly opposing tanks damage simultaneously and remain blocked", () => {
@@ -186,7 +188,7 @@ test("a direct killer takes the defeated square and pulls its friendly column fo
   assert.equal(state.board[4][2].id, 4);
 });
 
-test("bounded shuffle passes remove internal friendly gaps without advancing the leader twice", () => {
+test("bounded shuffle passes settle existing and newly deployed pieces before rendering", () => {
   let state = createInitialState();
   state.board[2][0] = unit(1, "p1", "tank");
   state.board[5][0] = unit(2, "p1", "healer");
@@ -195,7 +197,8 @@ test("bounded shuffle passes remove internal friendly gaps without advancing the
 
   assert.equal(state.board[1][0].id, 1);
   assert.equal(state.board[2][0].id, 2);
-  assert.equal(state.shufflePasses, 2);
+  assert.equal(state.board[3][0].owner, "p1");
+  assert.equal(state.shufflePasses, 4);
 });
 
 test("a ranged kill does not teleport the attacker into the defeated square", () => {
