@@ -9,7 +9,7 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 - Six staging slots per player, with both rows visible for debugging.
 - Up to two Tanks, two Arcs, two Rangers, and two Healers staged at a time.
 - Every available staging slot must be filled before a turn can be played.
-- A completely full board column blocks its staging slot until space opens again; blocked slots do not prevent the turn.
+- A staging slot remains usable when its entry piece is predicted to advance during the next resolution; only an entry that will remain occupied blocks placement.
 - Each player locks their row independently; the round resolves only after both are ready.
 - One-round deployment delay: both staged rows enter together for the following round.
 - Simultaneous abilities and movement prevent either player from gaining turn-order advantage.
@@ -20,12 +20,12 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 
 | Unit | Health | Ability |
 | --- | ---: | --- |
-| Tank | 5 | Deals 2 damage to the tile directly ahead. |
-| Arc | 3 | Deals 1 damage to the three forward-facing tiles. |
-| Ranger | 2 | Deals 2 damage exactly two tiles ahead. |
-| Healer | 3 | Restores 1 health to friendly units in the eight surrounding tiles. |
+| Tank | 10 | Deals 2 damage to the tile directly ahead. |
+| Arc | 5 | Deals 2 damage to the three forward-facing tiles. |
+| Ranger | 5 | Deals 1 damage directly ahead and 3 damage exactly two tiles ahead. |
+| Healer | 3 | After damage, restores 1 health to other friendly units in the eight surrounding tiles. |
 
-Both armies resolve abilities together before movement. Surviving units then attempt to advance one tile from the same board snapshot. Directly opposing units block each other until one is defeated, and two units targeting the same empty tile both hold position. Crossing the opponent's edge scores a breakthrough.
+Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Surviving friendly columns advance together into spaces vacated ahead. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. Crossing the opponent's edge scores a breakthrough.
 
 ## Run locally
 
@@ -49,3 +49,4 @@ npm test
 ## Next decisions
 
 The working title, unit names, health values, damage values, scoring target, and activation order are intentionally easy to change as playtesting reveals what feels good.
+
