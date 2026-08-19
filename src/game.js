@@ -1,7 +1,14 @@
-export const BOARD_SIZE = 6;
-export const SCORE_TO_WIN = BOARD_SIZE;
-export const MAX_STAGED = 6;
-export const MAX_PER_TYPE = 2;
+export const BOARD_ROWS = 6;
+export const BOARD_COLUMNS = 7;
+export const SCORE_TO_WIN = 4;
+export const MAX_STAGED = BOARD_COLUMNS;
+export const MAX_PER_TYPE = Object.freeze({
+  tank: 4,
+  dps: 2,
+  ranged: 2,
+  healer: 1,
+});
+export const CRITICAL_CHANCE = 0.2;
 
 export const PIECE_TYPES = Object.freeze({
   tank: {
@@ -26,7 +33,7 @@ export const PIECE_TYPES = Object.freeze({
     name: "Healer",
     short: "H",
     maxHp: 3,
-    description: "Heals adjacent allies by 1",
+    description: "Heals adjacent non-healers by 2",
   },
 });
 
@@ -34,18 +41,18 @@ const PLAYER_IDS = ["p1", "p2"];
 
 export function createInitialState() {
   return {
-    board: Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null)),
+    board: Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLUMNS).fill(null)),
     players: {
       p1: {
         name: "Player 1",
         score: 0,
-        staging: Array(BOARD_SIZE).fill(null),
+        staging: Array(BOARD_COLUMNS).fill(null),
         ready: false,
       },
       p2: {
         name: "Player 2",
         score: 0,
-        staging: Array(BOARD_SIZE).fill(null),
+        staging: Array(BOARD_COLUMNS).fill(null),
         ready: false,
       },
     },
@@ -90,7 +97,7 @@ export function queuePiece(state, playerId, column, type) {
   const ofType = staging.filter(
     (slot) => slot?.type === type && slot.status === "draft",
   ).length;
-  if (total >= MAX_STAGED || ofType >= MAX_PER_TYPE) return state;
+  if (total >= MAX_STAGED || ofType >= MAX_PER_TYPE[type]) return state;
 
   staging[column] = { type, status: "draft" };
   next.lastEvent = `${next.players[playerId].name} staged a ${PIECE_TYPES[type].name} in column ${column + 1}.`;
@@ -115,14 +122,14 @@ export function randomizeStaging(state, playerId, random = Math.random) {
   const staging = next.players[playerId].staging;
   const counts = Object.fromEntries(Object.keys(PIECE_TYPES).map((type) => [type, 0]));
 
-  for (let column = 0; column < BOARD_SIZE; column += 1) {
+  for (let column = 0; column < BOARD_COLUMNS; column += 1) {
     if (staging[column]?.status === "draft") staging[column] = null;
   }
 
-  for (let column = 0; column < BOARD_SIZE; column += 1) {
+  for (let column = 0; column < BOARD_COLUMNS; column += 1) {
     if (staging[column] || isStagingColumnBlocked(next, playerId, column)) continue;
     const availableTypes = Object.keys(PIECE_TYPES).filter(
-      (type) => counts[type] < MAX_PER_TYPE,
+      (type) => counts[type] < MAX_PER_TYPE[type],
     );
     const roll = Math.max(0, Math.min(0.999999, Number(random()) || 0));
     const type = availableTypes[Math.floor(roll * availableTypes.length)];
@@ -134,14 +141,14 @@ export function randomizeStaging(state, playerId, random = Math.random) {
   return next;
 }
 
-export function readyPlayer(state, playerId) {
+export function readyPlayer(state, playerId, random = Math.random) {
   if (!canReadyPlayer(state, playerId)) return state;
 
   const next = copyState(state);
   next.players[playerId].ready = true;
 
   if (PLAYER_IDS.every((id) => next.players[id].ready)) {
-    return resolveRound(next);
+    return resolveRound(next, random);
   }
 
   const waitingFor = PLAYER_IDS.find((id) => !next.players[id].ready);
@@ -166,11 +173,11 @@ export function isColumnFull(state, column) {
 
 export function isStagingColumnBlocked(state, playerId, column) {
   if (!state.players[playerId] || !isColumn(column)) return true;
-  const entryRow = playerId === "p1" ? BOARD_SIZE - 1 : 0;
+  const entryRow = playerId === "p1" ? BOARD_ROWS - 1 : 0;
   if (!state.board[entryRow][column]) return false;
 
   const preview = copyState(state);
-  const abilityResult = resolveAbilities(preview);
+  const abilityResult = resolveAbilities(preview, () => 1);
   const followThrough = followThroughDefeats(preview, abilityResult.defeats);
   advanceUnitsSimultaneously(preview, followThrough.movedUnitIds);
   return Boolean(preview.board[entryRow][column]);
@@ -193,12 +200,13 @@ export function canReadyPlayer(state, playerId) {
   );
 }
 
-function resolveRound(state) {
+function resolveRound(state, random) {
   const next = copyState(state);
   const resolvedRound = next.round;
   const events = [];
 
-  const abilityResult = resolveAbilities(next);
+  const abilityResult = resolveAbilities(next, random);
+  if (abilityResult.criticals > 0) events.push(`${abilityResult.criticals} critical`);
   if (abilityResult.damage > 0) events.push(`${abilityResult.damage} damage`);
   if (abilityResult.healing > 0) events.push(`${abilityResult.healing} healing`);
   if (abilityResult.defeated > 0) events.push(`${abilityResult.defeated} defeated`);
@@ -249,12 +257,12 @@ function resolveRound(state) {
 
 export function controlledColumns(state, playerId) {
   if (!state.players[playerId]) return 0;
-  const goalRow = playerId === "p1" ? 0 : BOARD_SIZE - 1;
+  const goalRow = playerId === "p1" ? 0 : BOARD_ROWS - 1;
   return state.board[goalRow].filter((unit) => unit?.owner === playerId).length;
 }
 
 function deployReadyUnits(state, playerId) {
-  const row = playerId === "p1" ? BOARD_SIZE - 1 : 0;
+  const row = playerId === "p1" ? BOARD_ROWS - 1 : 0;
   let deployed = 0;
 
   state.players[playerId].staging.forEach((slot, column) => {
@@ -273,23 +281,29 @@ function deployReadyUnits(state, playerId) {
   return deployed;
 }
 
-function resolveAbilities(state) {
+function resolveAbilities(state, random) {
   const damageEffects = new Map();
+  let criticals = 0;
 
   forEachUnit(state.board, (unit, row, column) => {
+    if (unit.type === "healer") return;
+    const multiplier = criticalMultiplier(random);
+    let applied = false;
     for (const target of targetsFor(unit, row, column)) {
       if (target.kind !== "damage") continue;
       if (!isOnBoard(target.row, target.column)) continue;
       const targetUnit = state.board[target.row][target.column];
       if (targetUnit && targetUnit.owner !== unit.owner) {
-        addEffect(damageEffects, targetUnit.id, target.amount, 0, {
+        addEffect(damageEffects, targetUnit.id, target.amount * multiplier, 0, {
           id: unit.id,
           owner: unit.owner,
           row,
           column,
         });
+        applied = true;
       }
     }
+    if (applied && multiplier === 2) criticals += 1;
   });
 
   let damage = 0;
@@ -319,13 +333,21 @@ function resolveAbilities(state) {
   const healingEffects = new Map();
   forEachUnit(state.board, (unit, row, column) => {
     if (unit.type !== "healer") return;
+    const multiplier = criticalMultiplier(random);
+    let applied = false;
     for (const target of targetsFor(unit, row, column)) {
       if (target.kind !== "heal" || !isOnBoard(target.row, target.column)) continue;
       const targetUnit = state.board[target.row][target.column];
-      if (targetUnit && targetUnit.id !== unit.id && targetUnit.owner === unit.owner) {
-        addEffect(healingEffects, targetUnit.id, 0, target.amount);
+      if (
+        targetUnit &&
+        targetUnit.type !== "healer" &&
+        targetUnit.owner === unit.owner
+      ) {
+        addEffect(healingEffects, targetUnit.id, 0, target.amount * multiplier);
+        applied = true;
       }
     }
+    if (applied && multiplier === 2) criticals += 1;
   });
 
   forEachUnit(state.board, (unit) => {
@@ -337,7 +359,12 @@ function resolveAbilities(state) {
     unit.hp = healedHp;
   });
 
-  return { damage, healing, defeated, defeats };
+  return { damage, healing, defeated, defeats, criticals };
+}
+
+function criticalMultiplier(random) {
+  const roll = Math.max(0, Math.min(0.999999, Number(random()) || 0));
+  return roll < CRITICAL_CHANCE ? 2 : 1;
 }
 
 function followThroughDefeats(state, defeats) {
@@ -474,7 +501,7 @@ function targetsFor(unit, row, column) {
       row: row + rowOffset,
       column: column + columnOffset,
       kind: "heal",
-      amount: 1,
+      amount: 2,
     }));
 }
 
@@ -497,10 +524,10 @@ function forEachUnit(board, callback) {
 }
 
 function isColumn(column) {
-  return Number.isInteger(column) && column >= 0 && column < BOARD_SIZE;
+  return Number.isInteger(column) && column >= 0 && column < BOARD_COLUMNS;
 }
 
 function isOnBoard(row, column) {
-  return row >= 0 && row < BOARD_SIZE && column >= 0 && column < BOARD_SIZE;
+  return row >= 0 && row < BOARD_ROWS && column >= 0 && column < BOARD_COLUMNS;
 }
 
