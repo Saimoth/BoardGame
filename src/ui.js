@@ -4,14 +4,14 @@ import {
   SCORE_TO_WIN,
   canReadyPlayer,
   createInitialState,
-  isColumnFull,
+  isStagingColumnBlocked,
   queuePiece,
   randomizeStaging,
   readyPlayer,
   removeQueuedPiece,
   requiredStagingSlots,
   stagingCounts,
-} from "./game.js";
+} from "./game.js?v=rules-v2";
 
 let state = createInitialState();
 let autoTimer = null;
@@ -160,21 +160,21 @@ function renderStaging(playerId) {
   element.innerHTML = "";
 
   player.staging.forEach((slot, column) => {
-    const columnFull = isColumnFull(state, column);
+    const columnBlocked = isStagingColumnBlocked(state, playerId, column);
     const button = document.createElement("button");
     button.className = "staging-cell";
     button.type = "button";
-    button.disabled = !isEditable || slot?.status === "ready" || (!slot && columnFull);
+    button.disabled = !isEditable || slot?.status === "ready" || (!slot && columnBlocked);
     button.dataset.status =
       player.ready && slot?.status === "draft"
         ? "locked"
-        : slot?.status ?? (columnFull ? "blocked" : "empty");
+        : slot?.status ?? (columnBlocked ? "blocked" : "empty");
     button.setAttribute(
       "aria-label",
       slot
         ? `${PIECE_TYPES[slot.type].name}, column ${column + 1}, ${player.ready ? "locked" : slot.status}`
-        : columnFull
-          ? `Column ${column + 1} is full; staging is blocked`
+        : columnBlocked
+          ? `Column ${column + 1} cannot open next round; staging is blocked`
           : `Place ${PIECE_TYPES[selectedType[playerId]].name} in column ${column + 1}`,
     );
 
@@ -182,8 +182,8 @@ function renderStaging(playerId) {
       button.append(createStagingToken(playerId, slot, player.ready));
     } else {
       const marker = document.createElement("span");
-      marker.className = columnFull ? "slot-marker slot-marker--blocked" : "slot-marker";
-      marker.textContent = columnFull ? "FULL" : "+";
+      marker.className = columnBlocked ? "slot-marker slot-marker--blocked" : "slot-marker";
+      marker.textContent = columnBlocked ? "WAIT" : "+";
       button.append(marker);
     }
 
