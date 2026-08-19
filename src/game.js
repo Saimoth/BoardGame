@@ -1,5 +1,5 @@
 export const BOARD_SIZE = 6;
-export const SCORE_TO_WIN = 5;
+export const SCORE_TO_WIN = BOARD_SIZE;
 export const MAX_STAGED = 6;
 export const MAX_PER_TYPE = 2;
 
@@ -209,11 +209,13 @@ function resolveRound(state) {
   const movementResult = advanceUnitsSimultaneously(next, followThrough.movedUnitIds);
   const totalMoved = followThrough.moved + movementResult.moved;
   if (totalMoved > 0) events.push(`${totalMoved} advanced`);
-  const totalScored = movementResult.scored.p1 + movementResult.scored.p2;
-  if (totalScored > 0) events.push(`${totalScored} breakthrough${totalScored === 1 ? "" : "s"}`);
 
-  const p1Won = next.players.p1.score >= SCORE_TO_WIN;
-  const p2Won = next.players.p2.score >= SCORE_TO_WIN;
+  for (const playerId of PLAYER_IDS) {
+    next.players[playerId].score = controlledColumns(next, playerId);
+  }
+
+  const p1Won = next.players.p1.score === SCORE_TO_WIN;
+  const p2Won = next.players.p2.score === SCORE_TO_WIN;
   if (p1Won && p2Won) next.winner = "draw";
   else if (p1Won) next.winner = "p1";
   else if (p2Won) next.winner = "p2";
@@ -221,8 +223,8 @@ function resolveRound(state) {
   if (next.winner) {
     next.lastEvent =
       next.winner === "draw"
-        ? `Round ${resolvedRound}: both players reached ${SCORE_TO_WIN}. The match is a draw.`
-        : `Round ${resolvedRound}: ${next.players[next.winner].name} wins with ${next.players[next.winner].score} breakthroughs!`;
+        ? `Round ${resolvedRound}: both players occupy all ${SCORE_TO_WIN} goal columns. The match is a draw.`
+        : `Round ${resolvedRound}: ${next.players[next.winner].name} wins by occupying all ${SCORE_TO_WIN} goal columns!`;
     return next;
   }
 
@@ -243,6 +245,12 @@ function resolveRound(state) {
   const summary = events.length ? events.join(" · ") : "no units activated";
   next.lastEvent = `Round ${resolvedRound}: ${summary}. Plan round ${next.round}.`;
   return next;
+}
+
+export function controlledColumns(state, playerId) {
+  if (!state.players[playerId]) return 0;
+  const goalRow = playerId === "p1" ? 0 : BOARD_SIZE - 1;
+  return state.board[goalRow].filter((unit) => unit?.owner === playerId).length;
 }
 
 function deployReadyUnits(state, playerId) {
@@ -402,8 +410,8 @@ function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
     const step = unit.owner === "p1" ? -1 : 1;
     const targetRow = row + step;
     if (!isOnBoard(targetRow, column)) {
-      memo.set(unit.id, true);
-      return true;
+      memo.set(unit.id, false);
+      return false;
     }
 
     const occupant = snapshot[targetRow][column];
@@ -419,32 +427,22 @@ function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
     return result;
   };
 
-  const exits = [];
   const successfulMoves = [];
   snapshot.forEach((row, rowIndex) => {
     row.forEach((unit, column) => {
       if (!unit || !canMove(unit)) return;
       const step = unit.owner === "p1" ? -1 : 1;
       const targetRow = rowIndex + step;
-      if (!isOnBoard(targetRow, column)) exits.push({ unit, row: rowIndex, column });
-      else successfulMoves.push({ unit, row: rowIndex, column, targetRow });
+      successfulMoves.push({ unit, row: rowIndex, column, targetRow });
     });
   });
 
-  for (const exit of exits) {
-    state.board[exit.row][exit.column] = null;
-    state.players[exit.unit.owner].score += 1;
-  }
   for (const move of successfulMoves) state.board[move.row][move.column] = null;
   for (const move of successfulMoves) state.board[move.targetRow][move.column] = move.unit;
 
   return {
     moved: successfulMoves.length,
     initiativeOwner,
-    scored: {
-      p1: exits.filter((exit) => exit.unit.owner === "p1").length,
-      p2: exits.filter((exit) => exit.unit.owner === "p2").length,
-    },
   };
 }
 

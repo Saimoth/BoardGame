@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   PIECE_TYPES,
   canReadyPlayer,
+  controlledColumns,
   createInitialState,
   isColumnFull,
   isStagingColumnBlocked,
@@ -104,17 +105,31 @@ test("a completely full column is skipped by random placement and counts as sati
   assert.equal(canReadyPlayer(state, "p1"), true);
 });
 
-test("a full column remains draftable when its entry will open next round", () => {
+test("an occupied entry remains draftable when its piece will move next round", () => {
   let state = createInitialState();
-  for (let row = 0; row < 6; row += 1) {
-    state.board[row][0] = unit(row + 1, "p1", "healer");
-  }
-  state.nextUnitId = 7;
+  state.board[5][0] = unit(1, "p1", "healer");
+  state.nextUnitId = 2;
 
-  assert.equal(isColumnFull(state, 0), true);
+  assert.equal(isColumnFull(state, 0), false);
   assert.equal(isStagingColumnBlocked(state, "p1", 0), false);
   state = queuePiece(state, "p1", 0, "tank");
   assert.equal(state.players.p1.staging[0].type, "tank");
+});
+
+test("random placement fills every staging slot predicted to open", () => {
+  let state = createInitialState();
+  state.board[5][0] = unit(1, "p1", "tank");
+  state.board[4][0] = unit(2, "p2", "tank");
+  state.board[5][1] = unit(3, "p1", "healer");
+  state.nextUnitId = 4;
+  state = randomizeStaging(state, "p1", () => 0.25);
+
+  assert.equal(isStagingColumnBlocked(state, "p1", 0), true);
+  assert.equal(state.players.p1.staging[0], null);
+  for (let column = 1; column < 6; column += 1) {
+    assert.ok(state.players.p1.staging[column]);
+  }
+  assert.equal(requiredStagingSlots(state, "p1"), 0);
 });
 
 test("both staged rows deploy for the following round", () => {
@@ -279,17 +294,64 @@ test("unit health values match the revised balance", () => {
   assert.equal(PIECE_TYPES.healer.maxHp, 3);
 });
 
-test("simultaneous fifth breakthroughs produce a draw", () => {
+test("a piece reaching the opposite edge remains active and cannot advance farther", () => {
   let state = createInitialState();
-  state.players.p1.score = 4;
-  state.players.p2.score = 4;
-  state.board[0][0] = unit(1, "p1", "healer");
-  state.board[5][5] = unit(2, "p2", "healer");
+  state.board[1][0] = unit(1, "p1", "healer");
+  state.board[2][0] = unit(2, "p1", "tank", 1);
   state.nextUnitId = 3;
+  state = resolveRound(state);
+  state = resolveRound(state);
+
+  assert.equal(state.board[0][0].id, 1);
+  assert.equal(state.board[1][0].id, 2);
+  assert.equal(state.board[1][0].hp, 3);
+  assert.equal(controlledColumns(state, "p1"), 1);
+});
+
+test("an enemy-held goal cell blocks staging until its occupant is removed", () => {
+  const state = createInitialState();
+  state.board[0][2] = unit(1, "p1", "tank");
+
+  assert.equal(isStagingColumnBlocked(state, "p2", 2), true);
+  state.board[0][2] = null;
+  assert.equal(isStagingColumnBlocked(state, "p2", 2), false);
+});
+
+test("occupying all six opposite-edge columns wins the match", () => {
+  let state = createInitialState();
+  for (let column = 0; column < 6; column += 1) {
+    state.board[1][column] = unit(column + 1, "p1", "healer");
+  }
+  state.nextUnitId = 7;
+  state = resolveRound(state);
+
+  assert.equal(state.players.p1.score, 6);
+  assert.equal(state.winner, "p1");
+});
+
+test("holding five goal columns does not end the match", () => {
+  let state = createInitialState();
+  for (let column = 0; column < 5; column += 1) {
+    state.board[0][column] = unit(column + 1, "p1", "healer");
+  }
+  state.nextUnitId = 6;
   state = resolveRound(state);
 
   assert.equal(state.players.p1.score, 5);
-  assert.equal(state.players.p2.score, 5);
+  assert.equal(state.winner, null);
+});
+
+test("simultaneously occupying all six goal columns produces a draw", () => {
+  let state = createInitialState();
+  for (let column = 0; column < 6; column += 1) {
+    state.board[0][column] = unit(column + 1, "p1", "healer");
+    state.board[5][column] = unit(column + 7, "p2", "healer");
+  }
+  state.nextUnitId = 13;
+  state = resolveRound(state);
+
+  assert.equal(state.players.p1.score, 6);
+  assert.equal(state.players.p2.score, 6);
   assert.equal(state.winner, "draw");
 });
 

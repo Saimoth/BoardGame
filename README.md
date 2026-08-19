@@ -14,7 +14,8 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 - One-round deployment delay: both staged rows enter together for the following round.
 - Simultaneous abilities and movement prevent either player from gaining turn-order advantage.
 - Optional per-player random automation supports solo debugging or a full one-round-per-second simulation.
-- First player to score five breakthroughs wins.
+- A piece reaching the opposite edge remains active there and blocks that opponent's staging column while it survives.
+- First player to occupy the opposite edge in all six columns at once wins.
 
 ## Unit rules
 
@@ -25,7 +26,7 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 | Ranger | 5 | Deals 1 damage directly ahead and 3 damage exactly two tiles ahead. |
 | Healer | 3 | After damage, restores 1 health to other friendly units in the eight surrounding tiles. |
 
-Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Surviving friendly columns advance together into spaces vacated ahead. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. Crossing the opponent's edge scores a breakthrough.
+Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Surviving friendly columns advance together into spaces vacated ahead. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. A piece that reaches the opposite edge holds that goal column, remains active, and cannot advance farther. The match ends when one player simultaneously holds all six goal columns.
 
 ## Run locally
 

@@ -11,7 +11,7 @@ import {
   removeQueuedPiece,
   requiredStagingSlots,
   stagingCounts,
-} from "./game.js?v=rules-v2";
+} from "./game.js?v=columns-v1";
 
 let state = createInitialState();
 let autoTimer = null;
@@ -71,7 +71,7 @@ function renderPlayer(playerId) {
           <input type="checkbox" data-auto-player="${playerId}" ${autoPlay[playerId] ? "checked" : ""} ${state.winner ? "disabled" : ""} />
           <span>Random</span>
         </label>
-        <div class="score" aria-label="${player.score} of ${SCORE_TO_WIN} breakthroughs">
+        <div class="score" aria-label="${player.score} of ${SCORE_TO_WIN} goal columns occupied">
           <strong>${player.score}</strong><span>/${SCORE_TO_WIN}</span>
         </div>
       </div>

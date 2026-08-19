@@ -58,13 +58,14 @@
           <li>Draft units enter the board for the following round wherever the starting tile is clear.</li>
           <li>A staging slot remains available when its entry piece is predicted to advance; it is blocked only when the entry will stay occupied.</li>
           <li>Enable <strong>Random</strong> for either player to automate that side every second; enable both to watch a complete simulation.</li>
-          <li>A unit crossing the opposite edge scores a breakthrough. First to five wins.</li>
+          <li>A unit reaching the opposite edge remains there and stays active. The opponent cannot stage in that column while it survives.</li>
+          <li>Occupy the opposite edge in all six columns at once to win.</li>
         </ol>
         <p class="debug-note">Both staging rows and both players’ units are visible during hot-seat testing.</p>
       </form>
     </dialog>
 
-    <script type="module" src="./src/ui.js?v=rules-v2"></script>
+    <script type="module" src="./src/ui.js?v=columns-v1"></script>
   </body>
 </html>
 
