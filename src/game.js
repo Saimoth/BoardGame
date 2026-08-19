@@ -187,8 +187,12 @@ function resolveRound(state) {
   if (abilityResult.healing > 0) events.push(`${abilityResult.healing} healing`);
   if (abilityResult.defeated > 0) events.push(`${abilityResult.defeated} defeated`);
 
-  const movementResult = advanceUnitsSimultaneously(next);
-  if (movementResult.moved > 0) events.push(`${movementResult.moved} advanced`);
+  const followThrough = followThroughDefeats(next, abilityResult.defeats);
+  if (followThrough.moved > 0) events.push(`${followThrough.moved} followed through`);
+
+  const movementResult = advanceUnitsSimultaneously(next, followThrough.movedUnitIds);
+  const totalMoved = followThrough.moved + movementResult.moved;
+  if (totalMoved > 0) events.push(`${totalMoved} advanced`);
   const totalScored = movementResult.scored.p1 + movementResult.scored.p2;
   if (totalScored > 0) events.push(`${totalScored} breakthrough${totalScored === 1 ? "" : "s"}`);
 
@@ -258,7 +262,12 @@ function resolveAbilities(state) {
         addEffect(effects, targetUnit.id, 0, target.amount);
       }
       if (target.kind === "damage" && targetUnit.owner !== unit.owner) {
-        addEffect(effects, targetUnit.id, target.amount, 0);
+        addEffect(effects, targetUnit.id, target.amount, 0, {
+          id: unit.id,
+          owner: unit.owner,
+          row,
+          column,
+        });
       }
     }
   });
@@ -266,6 +275,7 @@ function resolveAbilities(state) {
   let damage = 0;
   let healing = 0;
   let defeated = 0;
+  const defeats = [];
 
   forEachUnit(state.board, (unit, row, column) => {
     const effect = effects.get(unit.id);
@@ -276,6 +286,12 @@ function resolveAbilities(state) {
     const finalHp = healedHp - effect.damage;
     damage += Math.min(healedHp, effect.damage);
     if (finalHp <= 0) {
+      defeats.push({
+        unit: { ...unit },
+        row,
+        column,
+        attackers: effect.attackers,
+      });
       state.board[row][column] = null;
       defeated += 1;
     } else {
@@ -283,10 +299,50 @@ function resolveAbilities(state) {
     }
   });
 
-  return { damage, healing, defeated };
+  return { damage, healing, defeated, defeats };
 }
 
-function advanceUnitsSimultaneously(state) {
+function followThroughDefeats(state, defeats) {
+  const movedUnitIds = new Set();
+  let moved = 0;
+
+  for (const defeat of defeats) {
+    if (state.board[defeat.row][defeat.column]) continue;
+
+    const directAttackers = defeat.attackers.filter((attacker) => {
+      const step = attacker.owner === "p1" ? -1 : 1;
+      return (
+        attacker.column === defeat.column &&
+        attacker.row + step === defeat.row &&
+        state.board[attacker.row][attacker.column]?.id === attacker.id
+      );
+    });
+    const attackingOwners = new Set(directAttackers.map((attacker) => attacker.owner));
+    if (directAttackers.length !== 1 || attackingOwners.size !== 1) continue;
+
+    const attacker = directAttackers[0];
+    const step = attacker.owner === "p1" ? -1 : 1;
+    const chain = [];
+    for (
+      let row = attacker.row;
+      isOnBoard(row, defeat.column) && state.board[row][defeat.column]?.owner === attacker.owner;
+      row -= step
+    ) {
+      chain.push({ row, unit: state.board[row][defeat.column] });
+    }
+
+    for (const entry of chain) state.board[entry.row][defeat.column] = null;
+    for (const entry of chain) {
+      state.board[entry.row + step][defeat.column] = entry.unit;
+      movedUnitIds.add(entry.unit.id);
+      moved += 1;
+    }
+  }
+
+  return { moved, movedUnitIds };
+}
+
+function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
   const snapshot = state.board.map((row) => row.slice());
   const exits = [];
   const intents = [];
@@ -294,7 +350,7 @@ function advanceUnitsSimultaneously(state) {
 
   snapshot.forEach((row, rowIndex) => {
     row.forEach((unit, column) => {
-      if (!unit) return;
+      if (!unit || alreadyMoved.has(unit.id)) return;
       const step = unit.owner === "p1" ? -1 : 1;
       const targetRow = rowIndex + step;
       if (targetRow < 0 || targetRow >= BOARD_SIZE) {
@@ -354,10 +410,13 @@ function targetsFor(unit, row, column) {
     }));
 }
 
-function addEffect(effects, id, damage, healing) {
-  const current = effects.get(id) ?? { damage: 0, healing: 0 };
+function addEffect(effects, id, damage, healing, attacker = null) {
+  const current = effects.get(id) ?? { damage: 0, healing: 0, attackers: [] };
   current.damage += damage;
   current.healing += healing;
+  if (attacker && !current.attackers.some((source) => source.id === attacker.id)) {
+    current.attackers.push(attacker);
+  }
   effects.set(id, current);
 }
 
@@ -376,3 +435,4 @@ function isColumn(column) {
 function isOnBoard(row, column) {
   return row >= 0 && row < BOARD_SIZE && column >= 0 && column < BOARD_SIZE;
 }
+
