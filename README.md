@@ -1,13 +1,13 @@
 # Frontline 6
 
-A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 board.
+A mobile-first, two-player turn-based tactics prototype played on a shared 6×7 board.
 
 ## Current prototype
 
 - Portrait phone layout with safe padding around every screen edge.
 - Simultaneous two-player planning on a single hot-seat device.
-- Six staging slots per player, with both rows visible for debugging.
-- Up to two Tanks, two Arcs, two Rangers, and two Healers staged at a time.
+- Seven staging slots per player, with both rows visible for debugging.
+- Up to four Tanks, two Arcs, two Rangers, and one Healer staged at a time.
 - Every available staging slot must be filled before a turn can be played.
 - A staging slot remains usable when its entry piece is predicted to advance during the next resolution; only an entry that will remain occupied blocks placement.
 - Each player locks their row independently; the round resolves only after both are ready.
@@ -15,7 +15,8 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 - Simultaneous abilities and movement prevent either player from gaining turn-order advantage.
 - Optional per-player random automation supports solo debugging or a full one-round-per-second simulation.
 - A piece reaching the opposite edge remains active there and blocks that opponent's staging column while it survives.
-- First player to occupy the opposite edge in all six columns at once wins.
+- First player to occupy at least four of the seven opposite-edge columns at once wins.
+- Every unit has a 20% critical chance each round, doubling all damage or healing from that activation.
 
 ## Unit rules
 
@@ -24,9 +25,9 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 | Tank | 10 | Deals 2 damage to the tile directly ahead. |
 | Arc | 5 | Deals 2 damage to the three forward-facing tiles. |
 | Ranger | 5 | Deals 1 damage directly ahead and 3 damage exactly two tiles ahead. |
-| Healer | 3 | After damage, restores 1 health to other friendly units in the eight surrounding tiles. |
+| Healer | 3 | After damage, restores 2 health to adjacent friendly non-healers. |
 
-Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Surviving friendly columns advance together into spaces vacated ahead. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. A piece that reaches the opposite edge holds that goal column, remains active, and cannot advance farther. The match ends when one player simultaneously holds all six goal columns.
+Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Healers cannot heal themselves or other healers. Surviving friendly columns advance together into spaces vacated ahead. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. A piece that reaches the opposite edge holds that goal column, remains active, and cannot advance farther. The match ends when one player simultaneously holds at least four of the seven goal columns.
 
 ## Run locally
 
