@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0a1421" />
     <meta
       name="description"
-      content="Frontline 6 — a two-player, turn-based 6×6 tactics prototype."
+      content="Frontline 6 — a two-player, turn-based 6×7 tactics prototype."
     />
     <title>Frontline 6</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -28,7 +28,7 @@
 
       <section class="battlefield" aria-label="Battlefield">
         <div id="staging-p2" class="staging-row staging-row--top" aria-label="Player 2 staging row"></div>
-        <div id="board" class="board" role="grid" aria-label="6 by 6 game board"></div>
+        <div id="board" class="board" role="grid" aria-label="6 by 7 game board"></div>
         <div id="staging-p1" class="staging-row staging-row--bottom" aria-label="Player 1 staging row"></div>
       </section>
 
@@ -51,7 +51,7 @@
         </div>
         <ol>
           <li>Select a unit, then tap a staging slot. Tap a draft unit again to remove it.</li>
-          <li>Fill all six available staging slots, with no more than two new units of each type.</li>
+          <li>Fill all seven available staging slots: up to four Tanks, two Arcs, two Rangers, and one Healer.</li>
           <li>Each player presses <strong>Ready</strong>. The round resolves only after both players are locked in.</li>
           <li>Damage resolves first. Defeated pieces are removed, then surviving healers restore adjacent allies.</li>
           <li>Friendly columns advance together. White wins contested empty squares on odd rounds; Black wins them on even rounds.</li>
@@ -59,13 +59,14 @@
           <li>A staging slot remains available when its entry piece is predicted to advance; it is blocked only when the entry will stay occupied.</li>
           <li>Enable <strong>Random</strong> for either player to automate that side every second; enable both to watch a complete simulation.</li>
           <li>A unit reaching the opposite edge remains there and stays active. The opponent cannot stage in that column while it survives.</li>
-          <li>Occupy the opposite edge in all six columns at once to win.</li>
+          <li>Occupy at least four of the seven opposite-edge columns at once to win.</li>
+          <li>Each unit has a 20% critical chance per round, doubling all damage or healing from that activation.</li>
         </ol>
         <p class="debug-note">Both staging rows and both players’ units are visible during hot-seat testing.</p>
       </form>
     </dialog>
 
-    <script type="module" src="./src/ui.js?v=columns-v1"></script>
+    <script type="module" src="./src/ui.js?v=seven-columns-v1"></script>
   </body>
 </html>
 
