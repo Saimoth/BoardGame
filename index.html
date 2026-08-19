@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0a1421" />
     <meta
       name="description"
-      content="Frontline 6 â€” a two-player, turn-based 6Ã—6 tactics prototype."
+      content="Frontline 6 — a two-player, turn-based 6×6 tactics prototype."
     />
     <title>Frontline 6</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -47,23 +47,24 @@
             <p class="eyebrow">Prototype rules</p>
             <h2>How to play</h2>
           </div>
-          <button class="icon-button" value="close" aria-label="Close rules">Ã—</button>
+          <button class="icon-button" value="close" aria-label="Close rules">×</button>
         </div>
         <ol>
           <li>Select a unit, then tap a staging slot. Tap a draft unit again to remove it.</li>
           <li>Fill all six available staging slots, with no more than two new units of each type.</li>
           <li>Each player presses <strong>Ready</strong>. The round resolves only after both players are locked in.</li>
-          <li>Both armies use their abilities simultaneously, then attempt to advance one square. Opposing units block each other until one is defeated.</li>
+          <li>Damage resolves first. Defeated pieces are removed, then surviving healers restore adjacent allies.</li>
+          <li>Friendly columns advance together. White wins contested empty squares on odd rounds; Black wins them on even rounds.</li>
           <li>Draft units enter the board for the following round wherever the starting tile is clear.</li>
-          <li>A full board column blocks its staging slot until a space opens; blocked slots count as filled.</li>
+          <li>A staging slot remains available when its entry piece is predicted to advance; it is blocked only when the entry will stay occupied.</li>
           <li>Enable <strong>Random</strong> for either player to automate that side every second; enable both to watch a complete simulation.</li>
           <li>A unit crossing the opposite edge scores a breakthrough. First to five wins.</li>
         </ol>
-        <p class="debug-note">Both staging rows and both playersâ€™ units are visible during hot-seat testing.</p>
+        <p class="debug-note">Both staging rows and both players’ units are visible during hot-seat testing.</p>
       </form>
     </dialog>
 
-    <script type="module" src="./src/ui.js?v=daf8917"></script>
+    <script type="module" src="./src/ui.js?v=rules-v2"></script>
   </body>
 </html>
 
