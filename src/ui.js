@@ -12,7 +12,7 @@ import {
   requiredStagingSlots,
   shouldAutoReadyPlayer,
   stagingCounts,
-} from "./game.js?v=five-columns-v1";
+} from "./game.js?v=settled-render-v1";
 
 let state = createInitialState();
 let autoTimer = null;
@@ -22,6 +22,8 @@ const autoPlay = { p1: false, p2: false };
 const boardElement = document.querySelector("#board");
 const turnLabel = document.querySelector("#turn-label");
 const eventLog = document.querySelector("#event-log");
+const shuffleCounter = document.querySelector("#shuffle-counter");
+const shuffleCount = document.querySelector("#shuffle-count");
 const rulesDialog = document.querySelector("#rules-dialog");
 
 document.querySelector("#rules-button").addEventListener("click", () => rulesDialog.showModal());
@@ -44,6 +46,11 @@ function render() {
 
   turnLabel.textContent = roundStatus();
   eventLog.textContent = state.lastEvent;
+  shuffleCount.textContent = state.shufflePasses;
+  shuffleCounter.setAttribute(
+    "aria-label",
+    `${state.shufflePasses} formation shuffle passes in the last resolved round`,
+  );
   scheduleAutomation();
 }
 
@@ -74,6 +81,11 @@ function renderPlayer(playerId) {
         </label>
         <div class="score" aria-label="${player.score} of ${SCORE_TO_WIN} goal columns occupied">
           <strong>${player.score}</strong><span>/${SCORE_TO_WIN}</span>
+        </div>
+        <div class="played-debug" aria-label="${playedLabel(player)}" title="Cumulative units deployed">
+          ${Object.entries(PIECE_TYPES)
+            .map(([type, piece]) => `<span><b>${piece.short}</b>${player.played[type]}</span>`)
+            .join("")}
         </div>
       </div>
     </div>
@@ -132,6 +144,12 @@ function pickerButton(playerId, type, piece, count, isEditable) {
       <span class="choice-count">${count}/${limit}</span>
     </button>
   `;
+}
+
+function playedLabel(player) {
+  return Object.entries(PIECE_TYPES)
+    .map(([type, piece]) => `${piece.name}: ${player.played[type]} deployed`)
+    .join(", ");
 }
 
 function renderBoard() {
@@ -249,7 +267,13 @@ function scheduleAutomation() {
     autoTimer = null;
     for (const playerId of scheduledPlayers) {
       if (state.winner || state.players[playerId].ready) continue;
-      if (autoPlay[playerId]) state = randomizeStaging(state, playerId);
+      const hasDrafts = state.players[playerId].staging.some(
+        (slot) => slot?.status === "draft",
+      );
+      if (autoPlay[playerId] && !hasDrafts && requiredStagingSlots(state, playerId) > 0) {
+        state = randomizeStaging(state, playerId);
+        continue;
+      }
       if (canReadyPlayer(state, playerId)) state = readyPlayer(state, playerId);
     }
     render();
