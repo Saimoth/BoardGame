@@ -11,7 +11,7 @@ import {
   removeQueuedPiece,
   requiredStagingSlots,
   stagingCounts,
-} from "./game.js?v=columns-v1";
+} from "./game.js?v=seven-columns-v1";
 
 let state = createInitialState();
 let autoTimer = null;
@@ -115,7 +115,8 @@ function renderPlayer(playerId) {
 
 function pickerButton(playerId, type, piece, count, isEditable) {
   const isSelected = selectedType[playerId] === type;
-  const atLimit = count >= MAX_PER_TYPE;
+  const limit = MAX_PER_TYPE[type];
+  const atLimit = count >= limit;
   return `
     <button
       class="piece-choice ${isSelected ? "is-selected" : ""}"
@@ -127,7 +128,7 @@ function pickerButton(playerId, type, piece, count, isEditable) {
     >
       <span class="choice-icon piece-${type}">${piece.short}</span>
       <span class="choice-copy"><strong>${piece.name}</strong><small>${piece.maxHp} HP</small></span>
-      <span class="choice-count">${count}/${MAX_PER_TYPE}</span>
+      <span class="choice-count">${count}/${limit}</span>
     </button>
   `;
 }
@@ -137,7 +138,7 @@ function renderBoard() {
   state.board.forEach((row, rowIndex) => {
     row.forEach((unit, columnIndex) => {
       const cell = document.createElement("div");
-      cell.className = "board-cell";
+      cell.className = `board-cell${(rowIndex + columnIndex) % 2 ? " board-cell--alt" : ""}`;
       cell.setAttribute("role", "gridcell");
       cell.dataset.row = rowIndex;
       cell.dataset.column = columnIndex;
