@@ -48,6 +48,7 @@ function render() {
 
 function renderPlayer(playerId) {
   const player = state.players[playerId];
+  const side = playerId === "p1" ? "White" : "Black";
   const isEditable = !player.ready && !state.winner;
   const counts = stagingCounts(state, playerId);
   const remaining = requiredStagingSlots(state, playerId);
@@ -62,7 +63,7 @@ function renderPlayer(playerId) {
         <span class="player-dot" aria-hidden="true"></span>
         <div>
           <strong>${player.name}</strong>
-          <span>${player.ready ? "Locked and ready" : playerId === "p1" ? "Advances upward" : "Advances downward"}</span>
+          <span>${side} pieces · ${player.ready ? "locked and ready" : playerId === "p1" ? "advances upward" : "advances downward"}</span>
         </div>
       </div>
       <div class="player-heading-actions">
@@ -85,12 +86,12 @@ function renderPlayer(playerId) {
         state.winner
           ? "Match over"
           : player.ready
-            ? "Ready âœ“"
+            ? "Ready ✓"
             : remaining > 0
               ? `Fill ${remaining} more ${remaining === 1 ? "slot" : "slots"}`
               : "Ready"
       }</span>
-      <span class="play-arrow" aria-hidden="true">${player.ready ? "âœ“" : playerId === "p1" ? "â†‘" : "â†“"}</span>
+      <span class="play-arrow" aria-hidden="true">${player.ready ? "✓" : playerId === "p1" ? "↑" : "↓"}</span>
     </button>
   `;
 
@@ -222,9 +223,9 @@ function roundStatus() {
   const readyPlayers = ["p1", "p2"].filter((playerId) => state.players[playerId].ready);
   if (readyPlayers.length === 1) {
     const waitingFor = readyPlayers[0] === "p1" ? "p2" : "p1";
-    return `Round ${state.round} Â· waiting for ${state.players[waitingFor].name}`;
+    return `Round ${state.round} · waiting for ${state.players[waitingFor].name}`;
   }
-  return `Round ${state.round} Â· both players planning`;
+  return `Round ${state.round} · both players planning`;
 }
 
 function scheduleAutomation() {

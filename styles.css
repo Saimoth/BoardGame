@@ -218,8 +218,17 @@ button:focus-visible {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--active-color);
-  box-shadow: 0 0 12px var(--active-color);
+  border: 1px solid #ffffff;
+}
+
+.player-panel--top .player-dot {
+  background: #05070a;
+  box-shadow: 0 0 0 2px #747d88;
+}
+
+.player-panel--bottom .player-dot {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px #7f8a96;
 }
 
 .score {
@@ -475,14 +484,20 @@ button:focus-visible {
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
 }
 
-.owner-p1 {
-  background-color: var(--p1-dark);
-  box-shadow: 0 0 0 2px var(--p1), 0 5px 12px rgba(0, 0, 0, 0.3);
+.unit-token.owner-p1,
+.staged-token.owner-p1 {
+  border-color: #ffffff;
+  background-color: #f7f8fa;
+  color: #0a0d12;
+  box-shadow: 0 0 0 2px #ffffff, 0 5px 12px rgba(0, 0, 0, 0.4);
 }
 
-.owner-p2 {
-  background-color: var(--p2-dark);
-  box-shadow: 0 0 0 2px var(--p2), 0 5px 12px rgba(0, 0, 0, 0.3);
+.unit-token.owner-p2,
+.staged-token.owner-p2 {
+  border-color: #080b10;
+  background-color: #080b10;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px #9da7b2, 0 5px 12px rgba(0, 0, 0, 0.45);
 }
 
 .unit-letter {
