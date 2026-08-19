@@ -10,8 +10,9 @@ import {
   readyPlayer,
   removeQueuedPiece,
   requiredStagingSlots,
+  shouldAutoReadyPlayer,
   stagingCounts,
-} from "./game.js?v=seven-columns-v1";
+} from "./game.js?v=five-columns-v1";
 
 let state = createInitialState();
 let autoTimer = null;
@@ -200,11 +201,14 @@ function renderStaging(playerId) {
 
 function createToken(unit) {
   const piece = PIECE_TYPES[unit.type];
+  const healthPercent = Math.max(0, Math.min(100, (unit.hp / piece.maxHp) * 100));
   const token = document.createElement("div");
   token.className = `unit-token owner-${unit.owner} piece-${unit.type}`;
   token.innerHTML = `
     <span class="unit-letter">${piece.short}</span>
-    <span class="health" aria-hidden="true">${unit.hp}</span>
+    <span class="health-bar" role="img" aria-label="${unit.hp} of ${piece.maxHp} health">
+      <span class="health-fill" style="width: ${healthPercent}%"></span>
+    </span>
   `;
   return token;
 }
@@ -235,13 +239,17 @@ function scheduleAutomation() {
   const automatedPlayers = ["p1", "p2"].filter(
     (playerId) => autoPlay[playerId] && !state.players[playerId].ready,
   );
-  if (!automatedPlayers.length) return;
+  const forcedPlayers = ["p1", "p2"].filter((playerId) =>
+    shouldAutoReadyPlayer(state, playerId),
+  );
+  const scheduledPlayers = [...new Set([...automatedPlayers, ...forcedPlayers])];
+  if (!scheduledPlayers.length) return;
 
   autoTimer = window.setTimeout(() => {
     autoTimer = null;
-    for (const playerId of automatedPlayers) {
-      if (state.winner || state.players[playerId].ready || !autoPlay[playerId]) continue;
-      state = randomizeStaging(state, playerId);
+    for (const playerId of scheduledPlayers) {
+      if (state.winner || state.players[playerId].ready) continue;
+      if (autoPlay[playerId]) state = randomizeStaging(state, playerId);
       if (canReadyPlayer(state, playerId)) state = readyPlayer(state, playerId);
     }
     render();

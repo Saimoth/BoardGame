@@ -1,9 +1,9 @@
 export const BOARD_ROWS = 6;
-export const BOARD_COLUMNS = 7;
-export const SCORE_TO_WIN = 4;
+export const BOARD_COLUMNS = 5;
+export const SCORE_TO_WIN = 3;
 export const MAX_STAGED = BOARD_COLUMNS;
 export const MAX_PER_TYPE = Object.freeze({
-  tank: 4,
+  tank: 2,
   dps: 2,
   ranged: 2,
   healer: 1,
@@ -15,7 +15,7 @@ export const PIECE_TYPES = Object.freeze({
     name: "Tank",
     short: "T",
     maxHp: 10,
-    description: "2 damage directly ahead",
+    description: "1 damage across the 3 tiles ahead; taunts Arcs",
   },
   dps: {
     name: "Arc",
@@ -57,6 +57,7 @@ export function createInitialState() {
       },
     },
     round: 1,
+    shufflePasses: 0,
     nextUnitId: 1,
     winner: null,
     lastEvent: "Round 1: both players must fill their staging row and press ready.",
@@ -180,6 +181,7 @@ export function isStagingColumnBlocked(state, playerId, column) {
   const abilityResult = resolveAbilities(preview, () => 1);
   const followThrough = followThroughDefeats(preview, abilityResult.defeats);
   advanceUnitsSimultaneously(preview, followThrough.movedUnitIds);
+  compactFriendlyColumns(preview);
   return Boolean(preview.board[entryRow][column]);
 }
 
@@ -200,6 +202,13 @@ export function canReadyPlayer(state, playerId) {
   );
 }
 
+export function shouldAutoReadyPlayer(state, playerId) {
+  return (
+    canReadyPlayer(state, playerId) &&
+    state.players[playerId].staging.every((slot) => slot?.status !== "draft")
+  );
+}
+
 function resolveRound(state, random) {
   const next = copyState(state);
   const resolvedRound = next.round;
@@ -217,6 +226,11 @@ function resolveRound(state, random) {
   const movementResult = advanceUnitsSimultaneously(next, followThrough.movedUnitIds);
   const totalMoved = followThrough.moved + movementResult.moved;
   if (totalMoved > 0) events.push(`${totalMoved} advanced`);
+  const shuffleResult = compactFriendlyColumns(next);
+  next.shufflePasses = shuffleResult.passes;
+  if (shuffleResult.moved > 0) {
+    events.push(`${shuffleResult.moved} shuffled (${shuffleResult.passes} passes)`);
+  }
 
   for (const playerId of PLAYER_IDS) {
     next.players[playerId].score = controlledColumns(next, playerId);
@@ -283,10 +297,33 @@ function deployReadyUnits(state, playerId) {
 
 function resolveAbilities(state, random) {
   const damageEffects = new Map();
+  const arcFocus = arcFocusTargets(state);
   let criticals = 0;
 
   forEachUnit(state.board, (unit, row, column) => {
     if (unit.type === "healer") return;
+
+    if (unit.type === "dps") {
+      const focus = arcFocus.get(unit.id);
+      const targets = focus
+        ? [{ row: focus.row, column: focus.column, kind: "damage", amount: 3 }]
+        : targetsFor(unit, row, column);
+      for (const target of targets) {
+        if (!isOnBoard(target.row, target.column)) continue;
+        const targetUnit = state.board[target.row][target.column];
+        if (!targetUnit || targetUnit.owner === unit.owner) continue;
+        const multiplier = criticalMultiplier(random);
+        addEffect(damageEffects, targetUnit.id, target.amount * multiplier, 0, {
+          id: unit.id,
+          owner: unit.owner,
+          row,
+          column,
+        });
+        if (multiplier === 2) criticals += 1;
+      }
+      return;
+    }
+
     const multiplier = criticalMultiplier(random);
     let applied = false;
     for (const target of targetsFor(unit, row, column)) {
@@ -360,6 +397,36 @@ function resolveAbilities(state, random) {
   });
 
   return { damage, healing, defeated, defeats, criticals };
+}
+
+function arcFocusTargets(state) {
+  const focused = new Map();
+
+  forEachUnit(state.board, (unit, row, column) => {
+    if (unit.type !== "tank") return;
+    for (const target of targetsFor(unit, row, column)) {
+      if (!isOnBoard(target.row, target.column)) continue;
+      const arc = state.board[target.row][target.column];
+      if (!arc || arc.type !== "dps" || arc.owner === unit.owner) continue;
+
+      const candidate = {
+        id: unit.id,
+        row,
+        column,
+        alignment: Math.abs(column - target.column),
+      };
+      const current = focused.get(arc.id);
+      if (
+        !current ||
+        candidate.alignment < current.alignment ||
+        (candidate.alignment === current.alignment && candidate.column < current.column)
+      ) {
+        focused.set(arc.id, candidate);
+      }
+    }
+  });
+
+  return focused;
 }
 
 function criticalMultiplier(random) {
@@ -473,10 +540,46 @@ function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
   };
 }
 
+function compactFriendlyColumns(state) {
+  let moved = 0;
+  let passes = 0;
+
+  while (passes < BOARD_ROWS) {
+    const snapshot = state.board.map((row) => row.slice());
+    const moves = [];
+
+    forEachUnit(snapshot, (unit, row, column) => {
+      const step = unit.owner === "p1" ? -1 : 1;
+      const targetRow = row + step;
+      if (!isOnBoard(targetRow, column) || snapshot[targetRow][column]) return;
+
+      for (let lookAhead = targetRow + step; isOnBoard(lookAhead, column); lookAhead += step) {
+        const leader = snapshot[lookAhead][column];
+        if (!leader) continue;
+        if (leader.owner === unit.owner) moves.push({ unit, row, column, targetRow });
+        break;
+      }
+    });
+
+    if (!moves.length) break;
+    for (const move of moves) state.board[move.row][move.column] = null;
+    for (const move of moves) state.board[move.targetRow][move.column] = move.unit;
+    moved += moves.length;
+    passes += 1;
+  }
+
+  return { moved, passes };
+}
+
 function targetsFor(unit, row, column) {
   const step = unit.owner === "p1" ? -1 : 1;
   if (unit.type === "tank") {
-    return [{ row: row + step, column, kind: "damage", amount: 2 }];
+    return [-1, 0, 1].map((offset) => ({
+      row: row + step,
+      column: column + offset,
+      kind: "damage",
+      amount: 1,
+    }));
   }
   if (unit.type === "dps") {
     return [-1, 0, 1].map((offset) => ({

@@ -369,12 +369,12 @@ button:focus-visible {
 .board,
 .staging-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
 }
 
 .board {
-  aspect-ratio: 7 / 6;
+  aspect-ratio: 5 / 6;
   padding: 4px 0;
   grid-template-rows: repeat(6, minmax(0, 1fr));
 }
@@ -500,21 +500,24 @@ button:focus-visible {
   font-weight: 950;
 }
 
-.health {
+.health-bar {
   position: absolute;
-  right: -5px;
-  bottom: -4px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 3px;
-  display: grid;
-  place-items: center;
-  border: 2px solid #07111d;
-  border-radius: 9px;
-  background: #f5fbff;
-  color: #07111d;
-  font-size: 0.56rem;
-  font-weight: 950;
+  right: 10%;
+  bottom: 7%;
+  left: 10%;
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid #07111d;
+  border-radius: 4px;
+  background: #26323d;
+}
+
+.health-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #39d26f;
+  box-shadow: 0 0 5px rgba(57, 210, 111, 0.65);
 }
 
 .staged-token {
