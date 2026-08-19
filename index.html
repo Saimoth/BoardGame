@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a1421" />
+    <meta
+      name="description"
+      content="Frontline 6 — a two-player, turn-based 6×6 tactics prototype."
+    />
+    <title>Frontline 6</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="game-app" aria-label="Frontline 6 hot-seat game">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Hot-seat prototype</p>
+          <h1>Frontline <span>6</span></h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="rules-button" type="button" aria-label="Open rules">?</button>
+          <button class="text-button" id="reset-button" type="button">Reset</button>
+        </div>
+      </header>
+
+      <section id="player-p2" class="player-panel player-panel--top" aria-label="Player 2 controls"></section>
+
+      <section class="battlefield" aria-label="Battlefield">
+        <div id="staging-p2" class="staging-row staging-row--top" aria-label="Player 2 staging row"></div>
+        <div id="board" class="board" role="grid" aria-label="6 by 6 game board"></div>
+        <div id="staging-p1" class="staging-row staging-row--bottom" aria-label="Player 1 staging row"></div>
+      </section>
+
+      <section id="player-p1" class="player-panel player-panel--bottom" aria-label="Player 1 controls"></section>
+
+      <footer class="game-status" aria-live="polite">
+        <span id="turn-label"></span>
+        <p id="event-log"></p>
+      </footer>
+    </main>
+
+    <dialog id="rules-dialog" class="rules-dialog">
+      <form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Prototype rules</p>
+            <h2>How to play</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close rules">×</button>
+        </div>
+        <ol>
+          <li>Select a unit, then tap a staging slot. Tap a draft unit again to remove it.</li>
+          <li>You may stage six units, with no more than two of each type.</li>
+          <li>Press <strong>Play turn</strong>. Draft units lock, then enter the board at the start of your next turn.</li>
+          <li>Units use their ability, then advance one square. A blocked unit holds position.</li>
+          <li>A unit crossing the opposite edge scores a breakthrough. First to five wins.</li>
+        </ol>
+        <p class="debug-note">Both staging rows and both players’ units are visible during hot-seat testing.</p>
+      </form>
+    </dialog>
+
+    <script type="module" src="./src/ui.js"></script>
+  </body>
+</html>
