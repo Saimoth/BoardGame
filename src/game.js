@@ -46,12 +46,14 @@ export function createInitialState() {
       p1: {
         name: "Player 1",
         score: 0,
+        played: emptyPieceCounts(),
         staging: Array(BOARD_COLUMNS).fill(null),
         ready: false,
       },
       p2: {
         name: "Player 2",
         score: 0,
+        played: emptyPieceCounts(),
         staging: Array(BOARD_COLUMNS).fill(null),
         ready: false,
       },
@@ -73,6 +75,7 @@ function copyState(state) {
         playerId,
         {
           ...state.players[playerId],
+          played: { ...state.players[playerId].played },
           staging: state.players[playerId].staging.map((slot) =>
             slot ? { ...slot } : null,
           ),
@@ -227,10 +230,9 @@ function resolveRound(state, random) {
   const totalMoved = followThrough.moved + movementResult.moved;
   if (totalMoved > 0) events.push(`${totalMoved} advanced`);
   const shuffleResult = compactFriendlyColumns(next);
-  next.shufflePasses = shuffleResult.passes;
-  if (shuffleResult.moved > 0) {
-    events.push(`${shuffleResult.moved} shuffled (${shuffleResult.passes} passes)`);
-  }
+  let shuffled = shuffleResult.moved;
+  let shufflePasses = shuffleResult.passes;
+  next.shufflePasses = shufflePasses;
 
   for (const playerId of PLAYER_IDS) {
     next.players[playerId].score = controlledColumns(next, playerId);
@@ -262,6 +264,12 @@ function resolveRound(state, random) {
   );
   if (deployed > 0) events.push(`${deployed} deployed`);
 
+  const deploymentShuffle = compactFriendlyColumns(next);
+  shuffled += deploymentShuffle.moved;
+  shufflePasses += deploymentShuffle.passes;
+  next.shufflePasses = shufflePasses;
+  if (shuffled > 0) events.push(`${shuffled} shuffled (${shufflePasses} passes)`);
+
   for (const playerId of PLAYER_IDS) next.players[playerId].ready = false;
   next.round += 1;
   const summary = events.length ? events.join(" · ") : "no units activated";
@@ -289,10 +297,15 @@ function deployReadyUnits(state, playerId) {
       hp: piece.maxHp,
     };
     state.players[playerId].staging[column] = null;
+    state.players[playerId].played[slot.type] += 1;
     deployed += 1;
   });
 
   return deployed;
+}
+
+function emptyPieceCounts() {
+  return Object.fromEntries(Object.keys(PIECE_TYPES).map((type) => [type, 0]));
 }
 
 function resolveAbilities(state, random) {

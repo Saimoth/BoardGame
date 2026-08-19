@@ -14,6 +14,8 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×5 
 - One-round deployment delay: both staged rows enter together for the following round.
 - Simultaneous abilities and movement prevent either player from gaining turn-order advantage.
 - Optional per-player random automation supports solo debugging or a full one-round-per-second simulation.
+- Automated sides render their random staging row before submitting it on the following automation tick.
+- Debug counters show cumulative deployments by unit type and the last round's bounded shuffle-pass count.
 - A piece reaching the opposite edge remains active there and blocks that opponent's staging column while it survives.
 - First player to occupy at least three of the five opposite-edge columns at once wins.
 - Every unit has a 20% critical chance. Arc spread attacks roll independently for each occupied target; other abilities roll once per activation.
@@ -27,7 +29,7 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×5 
 | Ranger | 5 | Deals 1 damage directly ahead and 3 damage exactly two tiles ahead. |
 | Healer | 3 | After damage, restores 2 health to adjacent friendly non-healers. |
 
-Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Healers cannot heal themselves or other healers. Surviving friendly columns advance together into spaces vacated ahead, then bounded shuffle passes close internal friendly gaps without advancing the leading unit again. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. A piece that reaches the opposite edge holds that goal column, remains active, and cannot advance farther. The match ends when one player simultaneously holds at least three of the five goal columns.
+Damage resolves before healing, so lethal damage cannot be undone and defeated healers do not heal. Healers cannot heal themselves or other healers. Surviving friendly columns advance together into spaces vacated ahead. Bounded shuffle passes then close internal friendly gaps, newly staged pieces deploy, and a second bounded shuffle settles those deployments before the board renders. When opposing units target the same empty tile, White has initiative on odd rounds and Black on even rounds. A piece that reaches the opposite edge holds that goal column, remains active, and cannot advance farther. The match ends when one player simultaneously holds at least three of the five goal columns.
 
 ## Run locally
 

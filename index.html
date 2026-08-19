@@ -27,6 +27,9 @@
       <section id="player-p2" class="player-panel player-panel--top" aria-label="Player 2 controls"></section>
 
       <section class="battlefield" aria-label="Battlefield">
+        <div id="shuffle-counter" class="shuffle-counter" aria-label="0 formation shuffle passes in the last resolved round">
+          <span>Shift</span><strong id="shuffle-count">0</strong>
+        </div>
         <div id="staging-p2" class="staging-row staging-row--top" aria-label="Player 2 staging row"></div>
         <div id="board" class="board" role="grid" aria-label="6 by 5 game board"></div>
         <div id="staging-p1" class="staging-row staging-row--bottom" aria-label="Player 1 staging row"></div>
@@ -66,7 +69,7 @@
       </form>
     </dialog>
 
-    <script type="module" src="./src/ui.js?v=five-columns-v1"></script>
+    <script type="module" src="./src/ui.js?v=settled-render-v1"></script>
   </body>
 </html>
 
