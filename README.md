@@ -8,6 +8,8 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 - Two-player hot-seat play on a single device.
 - Six staging slots per player, with both rows visible for debugging.
 - Up to two Tanks, two Arcs, two Rangers, and two Healers staged at a time.
+- Every available staging slot must be filled before a turn can be played.
+- A completely full board column blocks its staging slot until space opens again; blocked slots do not prevent the turn.
 - One-turn deployment delay: units staged now enter at the start of that player's next turn.
 - Automatic abilities and forward movement when a player confirms their turn.
 - First player to score five breakthroughs wins.
@@ -21,7 +23,7 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 | Ranger | 2 | Deals 2 damage exactly two tiles ahead. |
 | Healer | 3 | Restores 1 health to friendly units in the eight surrounding tiles. |
 
-Abilities resolve before movement. Surviving units then advance one tile toward the opponent if the tile is empty. Crossing the opponent's edge scores a breakthrough.
+Abilities resolve before movement. Surviving units then advance one tile toward the opponent if the tile is empty. Directly opposing units block each other until one is defeated. Crossing the opponent's edge scores a breakthrough.
 
 ## Run locally
 

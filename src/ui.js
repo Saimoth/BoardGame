@@ -3,10 +3,13 @@ import {
   MAX_PER_TYPE,
   PIECE_TYPES,
   SCORE_TO_WIN,
+  canPlayTurn,
   createInitialState,
+  isColumnFull,
   playTurn,
   queuePiece,
   removeQueuedPiece,
+  requiredStagingSlots,
   stagingCounts,
 } from "./game.js";
 
@@ -45,6 +48,8 @@ function renderPlayer(playerId) {
   const player = state.players[playerId];
   const isActive = playerId === state.currentPlayer && !state.winner;
   const counts = stagingCounts(state, playerId);
+  const remaining = requiredStagingSlots(state, playerId);
+  const turnReady = canPlayTurn(state, playerId);
   const panel = document.querySelector(`#player-${playerId}`);
 
   panel.classList.toggle("is-active", isActive);
@@ -66,8 +71,16 @@ function renderPlayer(playerId) {
         .map(([type, piece]) => pickerButton(playerId, type, piece, counts[type], isActive))
         .join("")}
     </div>
-    <button class="play-button" type="button" ${isActive ? "" : "disabled"}>
-      <span>${state.winner ? "Match over" : isActive ? "Play turn" : "Waiting"}</span>
+    <button class="play-button" type="button" ${turnReady ? "" : "disabled"}>
+      <span>${
+        state.winner
+          ? "Match over"
+          : !isActive
+            ? "Waiting"
+            : remaining > 0
+              ? `Fill ${remaining} more ${remaining === 1 ? "slot" : "slots"}`
+              : "Play turn"
+      }</span>
       <span class="play-arrow" aria-hidden="true">${playerId === "p1" ? "↑" : "↓"}</span>
     </button>
   `;
@@ -127,15 +140,18 @@ function renderStaging(playerId) {
   element.innerHTML = "";
 
   player.staging.forEach((slot, column) => {
+    const columnFull = isColumnFull(state, column);
     const button = document.createElement("button");
     button.className = "staging-cell";
     button.type = "button";
-    button.disabled = !isActive || slot?.status === "ready";
-    button.dataset.status = slot?.status ?? "empty";
+    button.disabled = !isActive || slot?.status === "ready" || (!slot && columnFull);
+    button.dataset.status = slot?.status ?? (columnFull ? "blocked" : "empty");
     button.setAttribute(
       "aria-label",
       slot
         ? `${PIECE_TYPES[slot.type].name}, column ${column + 1}, ${slot.status}`
+        : columnFull
+          ? `Column ${column + 1} is full; staging is blocked`
         : `Place ${PIECE_TYPES[selectedType[playerId]].name} in column ${column + 1}`,
     );
 
@@ -143,8 +159,8 @@ function renderStaging(playerId) {
       button.append(createStagingToken(playerId, slot));
     } else {
       const marker = document.createElement("span");
-      marker.className = "slot-marker";
-      marker.textContent = "+";
+      marker.className = columnFull ? "slot-marker slot-marker--blocked" : "slot-marker";
+      marker.textContent = columnFull ? "FULL" : "+";
       button.append(marker);
     }
 

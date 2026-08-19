@@ -68,14 +68,16 @@ function copyState(state) {
 export function queuePiece(state, playerId, column, type) {
   if (state.winner) return state;
   if (playerId !== state.currentPlayer) return state;
-  if (!PIECE_TYPES[type] || !isColumn(column)) return state;
+  if (!PIECE_TYPES[type] || !isColumn(column) || isColumnFull(state, column)) return state;
 
   const next = copyState(state);
   const staging = next.players[playerId].staging;
   if (staging[column]) return state;
 
   const total = staging.filter(Boolean).length;
-  const ofType = staging.filter((slot) => slot?.type === type).length;
+  const ofType = staging.filter(
+    (slot) => slot?.type === type && slot.status === "draft",
+  ).length;
   if (total >= MAX_STAGED || ofType >= MAX_PER_TYPE) return state;
 
   staging[column] = { type, status: "draft" };
@@ -95,7 +97,7 @@ export function removeQueuedPiece(state, playerId, column) {
 }
 
 export function playTurn(state) {
-  if (state.winner) return state;
+  if (state.winner || !canPlayTurn(state, state.currentPlayer)) return state;
 
   const next = copyState(state);
   const activePlayer = next.currentPlayer;
@@ -134,8 +136,29 @@ export function stagingCounts(state, playerId) {
   return Object.fromEntries(
     Object.keys(PIECE_TYPES).map((type) => [
       type,
-      staging.filter((slot) => slot?.type === type).length,
+      staging.filter((slot) => slot?.type === type && slot.status === "draft").length,
     ]),
+  );
+}
+
+export function isColumnFull(state, column) {
+  if (!isColumn(column)) return false;
+  return state.board.every((row) => Boolean(row[column]));
+}
+
+export function requiredStagingSlots(state, playerId) {
+  return state.players[playerId].staging.reduce(
+    (remaining, slot, column) =>
+      remaining + (!slot && !isColumnFull(state, column) ? 1 : 0),
+    0,
+  );
+}
+
+export function canPlayTurn(state, playerId) {
+  return (
+    !state.winner &&
+    playerId === state.currentPlayer &&
+    requiredStagingSlots(state, playerId) === 0
   );
 }
 

@@ -324,12 +324,14 @@ button:focus-visible {
 .board {
   aspect-ratio: 1;
   padding: 4px 0;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
 }
 
 .board-cell,
 .staging-cell {
   position: relative;
   min-width: 0;
+  min-height: 0;
   display: grid;
   place-items: center;
   border-radius: 8px;
@@ -384,15 +386,29 @@ button:focus-visible {
   background: repeating-linear-gradient(135deg, #162b3d 0 7px, #102435 7px 14px);
 }
 
+.staging-cell[data-status="blocked"] {
+  border-style: solid;
+  border-color: #243b4e;
+  background: repeating-linear-gradient(135deg, #0b1824 0 6px, #101f2d 6px 12px);
+}
+
 .slot-marker {
   color: #3b566c;
   font-size: 1rem;
   font-weight: 600;
 }
 
+.slot-marker--blocked {
+  color: #60778b;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
 .unit-token {
   position: relative;
   width: 78%;
+  max-height: 78%;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
