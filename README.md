@@ -5,13 +5,15 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 ## Current prototype
 
 - Portrait phone layout with safe padding around every screen edge.
-- Two-player hot-seat play on a single device.
+- Simultaneous two-player planning on a single hot-seat device.
 - Six staging slots per player, with both rows visible for debugging.
 - Up to two Tanks, two Arcs, two Rangers, and two Healers staged at a time.
 - Every available staging slot must be filled before a turn can be played.
 - A completely full board column blocks its staging slot until space opens again; blocked slots do not prevent the turn.
-- One-turn deployment delay: units staged now enter at the start of that player's next turn.
-- Automatic abilities and forward movement when a player confirms their turn.
+- Each player locks their row independently; the round resolves only after both are ready.
+- One-round deployment delay: both staged rows enter together for the following round.
+- Simultaneous abilities and movement prevent either player from gaining turn-order advantage.
+- Optional per-player random automation supports solo debugging or a full one-round-per-second simulation.
 - First player to score five breakthroughs wins.
 
 ## Unit rules
@@ -23,7 +25,7 @@ A mobile-first, two-player turn-based tactics prototype played on a shared 6×6 
 | Ranger | 2 | Deals 2 damage exactly two tiles ahead. |
 | Healer | 3 | Restores 1 health to friendly units in the eight surrounding tiles. |
 
-Abilities resolve before movement. Surviving units then advance one tile toward the opponent if the tile is empty. Directly opposing units block each other until one is defeated. Crossing the opponent's edge scores a breakthrough.
+Both armies resolve abilities together before movement. Surviving units then attempt to advance one tile from the same board snapshot. Directly opposing units block each other until one is defeated, and two units targeting the same empty tile both hold position. Crossing the opponent's edge scores a breakthrough.
 
 ## Run locally
 

@@ -36,14 +36,23 @@ export function createInitialState() {
   return {
     board: Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null)),
     players: {
-      p1: { name: "Player 1", score: 0, staging: Array(BOARD_SIZE).fill(null) },
-      p2: { name: "Player 2", score: 0, staging: Array(BOARD_SIZE).fill(null) },
+      p1: {
+        name: "Player 1",
+        score: 0,
+        staging: Array(BOARD_SIZE).fill(null),
+        ready: false,
+      },
+      p2: {
+        name: "Player 2",
+        score: 0,
+        staging: Array(BOARD_SIZE).fill(null),
+        ready: false,
+      },
     },
-    currentPlayer: "p1",
-    turn: 1,
+    round: 1,
     nextUnitId: 1,
     winner: null,
-    lastEvent: "Player 1: choose pieces, place them in the lower staging row, then play.",
+    lastEvent: "Round 1: both players must fill their staging row and press ready.",
   };
 }
 
@@ -66,8 +75,7 @@ function copyState(state) {
 }
 
 export function queuePiece(state, playerId, column, type) {
-  if (state.winner) return state;
-  if (playerId !== state.currentPlayer) return state;
+  if (state.winner || state.players[playerId]?.ready) return state;
   if (!PIECE_TYPES[type] || !isColumn(column) || isColumnFull(state, column)) return state;
 
   const next = copyState(state);
@@ -86,8 +94,8 @@ export function queuePiece(state, playerId, column, type) {
 }
 
 export function removeQueuedPiece(state, playerId, column) {
-  if (state.winner || playerId !== state.currentPlayer || !isColumn(column)) return state;
-  const slot = state.players[playerId].staging[column];
+  if (state.winner || state.players[playerId]?.ready || !isColumn(column)) return state;
+  const slot = state.players[playerId]?.staging[column];
   if (!slot || slot.status !== "draft") return state;
 
   const next = copyState(state);
@@ -96,38 +104,44 @@ export function removeQueuedPiece(state, playerId, column) {
   return next;
 }
 
-export function playTurn(state) {
-  if (state.winner || !canPlayTurn(state, state.currentPlayer)) return state;
+export function randomizeStaging(state, playerId, random = Math.random) {
+  if (state.winner || state.players[playerId]?.ready) return state;
 
   const next = copyState(state);
-  const activePlayer = next.currentPlayer;
-  const events = [];
+  const staging = next.players[playerId].staging;
+  const counts = Object.fromEntries(Object.keys(PIECE_TYPES).map((type) => [type, 0]));
 
-  const abilityResult = resolveAbilities(next, activePlayer);
-  if (abilityResult.damage > 0) events.push(`${abilityResult.damage} damage`);
-  if (abilityResult.healing > 0) events.push(`${abilityResult.healing} healing`);
-  if (abilityResult.defeated > 0) events.push(`${abilityResult.defeated} defeated`);
-
-  const movementResult = advanceUnits(next, activePlayer);
-  if (movementResult.moved > 0) events.push(`${movementResult.moved} advanced`);
-  if (movementResult.scored > 0) events.push(`${movementResult.scored} breakthrough`);
-
-  for (const slot of next.players[activePlayer].staging) {
-    if (slot?.status === "draft") slot.status = "ready";
+  for (let column = 0; column < BOARD_SIZE; column += 1) {
+    if (staging[column]?.status === "draft") staging[column] = null;
   }
 
-  if (next.players[activePlayer].score >= SCORE_TO_WIN) {
-    next.winner = activePlayer;
-    next.lastEvent = `${next.players[activePlayer].name} wins with ${next.players[activePlayer].score} breakthroughs!`;
-    return next;
+  for (let column = 0; column < BOARD_SIZE; column += 1) {
+    if (staging[column] || isColumnFull(next, column)) continue;
+    const availableTypes = Object.keys(PIECE_TYPES).filter(
+      (type) => counts[type] < MAX_PER_TYPE,
+    );
+    const roll = Math.max(0, Math.min(0.999999, Number(random()) || 0));
+    const type = availableTypes[Math.floor(roll * availableTypes.length)];
+    staging[column] = { type, status: "draft" };
+    counts[type] += 1;
   }
 
-  next.currentPlayer = otherPlayer(activePlayer);
-  next.turn += 1;
-  const deployed = deployReadyUnits(next, next.currentPlayer);
-  const summary = events.length ? events.join(" · ") : "no units activated";
-  const deploySummary = deployed ? ` · ${deployed} deployed for ${next.players[next.currentPlayer].name}` : "";
-  next.lastEvent = `${next.players[activePlayer].name}: ${summary}${deploySummary}.`;
+  next.lastEvent = `${next.players[playerId].name} generated a random staging row.`;
+  return next;
+}
+
+export function readyPlayer(state, playerId) {
+  if (!canReadyPlayer(state, playerId)) return state;
+
+  const next = copyState(state);
+  next.players[playerId].ready = true;
+
+  if (PLAYER_IDS.every((id) => next.players[id].ready)) {
+    return resolveRound(next);
+  }
+
+  const waitingFor = PLAYER_IDS.find((id) => !next.players[id].ready);
+  next.lastEvent = `${next.players[playerId].name} is ready. Waiting for ${next.players[waitingFor].name}.`;
   return next;
 }
 
@@ -154,12 +168,61 @@ export function requiredStagingSlots(state, playerId) {
   );
 }
 
-export function canPlayTurn(state, playerId) {
+export function canReadyPlayer(state, playerId) {
   return (
     !state.winner &&
-    playerId === state.currentPlayer &&
+    Boolean(state.players[playerId]) &&
+    !state.players[playerId].ready &&
     requiredStagingSlots(state, playerId) === 0
   );
+}
+
+function resolveRound(state) {
+  const next = copyState(state);
+  const resolvedRound = next.round;
+  const events = [];
+
+  const abilityResult = resolveAbilities(next);
+  if (abilityResult.damage > 0) events.push(`${abilityResult.damage} damage`);
+  if (abilityResult.healing > 0) events.push(`${abilityResult.healing} healing`);
+  if (abilityResult.defeated > 0) events.push(`${abilityResult.defeated} defeated`);
+
+  const movementResult = advanceUnitsSimultaneously(next);
+  if (movementResult.moved > 0) events.push(`${movementResult.moved} advanced`);
+  const totalScored = movementResult.scored.p1 + movementResult.scored.p2;
+  if (totalScored > 0) events.push(`${totalScored} breakthrough${totalScored === 1 ? "" : "s"}`);
+
+  const p1Won = next.players.p1.score >= SCORE_TO_WIN;
+  const p2Won = next.players.p2.score >= SCORE_TO_WIN;
+  if (p1Won && p2Won) next.winner = "draw";
+  else if (p1Won) next.winner = "p1";
+  else if (p2Won) next.winner = "p2";
+
+  if (next.winner) {
+    next.lastEvent =
+      next.winner === "draw"
+        ? `Round ${resolvedRound}: both players reached ${SCORE_TO_WIN}. The match is a draw.`
+        : `Round ${resolvedRound}: ${next.players[next.winner].name} wins with ${next.players[next.winner].score} breakthroughs!`;
+    return next;
+  }
+
+  for (const playerId of PLAYER_IDS) {
+    for (const slot of next.players[playerId].staging) {
+      if (slot?.status === "draft") slot.status = "ready";
+    }
+  }
+
+  const deployed = PLAYER_IDS.reduce(
+    (total, playerId) => total + deployReadyUnits(next, playerId),
+    0,
+  );
+  if (deployed > 0) events.push(`${deployed} deployed`);
+
+  for (const playerId of PLAYER_IDS) next.players[playerId].ready = false;
+  next.round += 1;
+  const summary = events.length ? events.join(" · ") : "no units activated";
+  next.lastEvent = `Round ${resolvedRound}: ${summary}. Plan round ${next.round}.`;
+  return next;
 }
 
 function deployReadyUnits(state, playerId) {
@@ -182,20 +245,19 @@ function deployReadyUnits(state, playerId) {
   return deployed;
 }
 
-function resolveAbilities(state, playerId) {
+function resolveAbilities(state) {
   const effects = new Map();
 
   forEachUnit(state.board, (unit, row, column) => {
-    if (unit.owner !== playerId) return;
     for (const target of targetsFor(unit, row, column)) {
       if (!isOnBoard(target.row, target.column)) continue;
       const targetUnit = state.board[target.row][target.column];
       if (!targetUnit) continue;
 
-      if (target.kind === "heal" && targetUnit.owner === playerId) {
+      if (target.kind === "heal" && targetUnit.owner === unit.owner) {
         addEffect(effects, targetUnit.id, 0, target.amount);
       }
-      if (target.kind === "damage" && targetUnit.owner !== playerId) {
+      if (target.kind === "damage" && targetUnit.owner !== unit.owner) {
         addEffect(effects, targetUnit.id, target.amount, 0);
       }
     }
@@ -224,32 +286,43 @@ function resolveAbilities(state, playerId) {
   return { damage, healing, defeated };
 }
 
-function advanceUnits(state, playerId) {
-  const step = playerId === "p1" ? -1 : 1;
-  const rows = Array.from({ length: BOARD_SIZE }, (_, index) => index);
-  if (playerId === "p2") rows.reverse();
+function advanceUnitsSimultaneously(state) {
+  const snapshot = state.board.map((row) => row.slice());
+  const exits = [];
+  const intents = [];
+  const targetCounts = new Map();
 
-  let moved = 0;
-  let scored = 0;
-
-  for (const row of rows) {
-    for (let column = 0; column < BOARD_SIZE; column += 1) {
-      const unit = state.board[row][column];
-      if (!unit || unit.owner !== playerId) continue;
-      const nextRow = row + step;
-      if (nextRow < 0 || nextRow >= BOARD_SIZE) {
-        state.board[row][column] = null;
-        state.players[playerId].score += 1;
-        scored += 1;
-      } else if (!state.board[nextRow][column]) {
-        state.board[nextRow][column] = unit;
-        state.board[row][column] = null;
-        moved += 1;
+  snapshot.forEach((row, rowIndex) => {
+    row.forEach((unit, column) => {
+      if (!unit) return;
+      const step = unit.owner === "p1" ? -1 : 1;
+      const targetRow = rowIndex + step;
+      if (targetRow < 0 || targetRow >= BOARD_SIZE) {
+        exits.push({ unit, row: rowIndex, column });
+        return;
       }
-    }
-  }
+      if (snapshot[targetRow][column]) return;
+      const key = `${targetRow}:${column}`;
+      intents.push({ unit, row: rowIndex, column, targetRow, key });
+      targetCounts.set(key, (targetCounts.get(key) ?? 0) + 1);
+    });
+  });
 
-  return { moved, scored };
+  const successfulMoves = intents.filter((intent) => targetCounts.get(intent.key) === 1);
+  for (const exit of exits) {
+    state.board[exit.row][exit.column] = null;
+    state.players[exit.unit.owner].score += 1;
+  }
+  for (const move of successfulMoves) state.board[move.row][move.column] = null;
+  for (const move of successfulMoves) state.board[move.targetRow][move.column] = move.unit;
+
+  return {
+    moved: successfulMoves.length,
+    scored: {
+      p1: exits.filter((exit) => exit.unit.owner === "p1").length,
+      p2: exits.filter((exit) => exit.unit.owner === "p2").length,
+    },
+  };
 }
 
 function targetsFor(unit, row, column) {
@@ -294,10 +367,6 @@ function forEachUnit(board, callback) {
       if (unit) callback(unit, rowIndex, columnIndex);
     }),
   );
-}
-
-function otherPlayer(playerId) {
-  return playerId === "p1" ? "p2" : "p1";
 }
 
 function isColumn(column) {

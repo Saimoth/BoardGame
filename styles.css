@@ -65,7 +65,9 @@ button:focus-visible {
 .player-heading,
 .player-identity,
 .dialog-heading,
-.topbar-actions {
+.topbar-actions,
+.player-heading-actions,
+.random-toggle {
   display: flex;
   align-items: center;
 }
@@ -145,6 +147,11 @@ button:focus-visible {
   opacity: 1;
 }
 
+.player-panel.is-ready {
+  border-color: color-mix(in srgb, var(--active-color) 55%, var(--line));
+  opacity: 0.84;
+}
+
 .player-panel--top {
   --active-color: var(--p2);
 }
@@ -155,6 +162,37 @@ button:focus-visible {
 
 .player-heading {
   margin-bottom: 7px;
+}
+
+.player-heading-actions {
+  gap: 9px;
+}
+
+.random-toggle {
+  min-height: 30px;
+  gap: 5px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #091725;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  cursor: pointer;
+  user-select: none;
+}
+
+.random-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--active-color);
+}
+
+.random-toggle:has(input:checked) {
+  border-color: var(--active-color);
+  color: var(--text);
+  background: color-mix(in srgb, var(--active-color) 12%, #091725);
 }
 
 .player-identity {
@@ -301,6 +339,11 @@ button:focus-visible {
   cursor: default;
 }
 
+.play-button.is-ready:disabled {
+  background: color-mix(in srgb, var(--active-color) 24%, #152636);
+  color: var(--active-color);
+}
+
 .play-arrow {
   font-size: 1rem;
 }
@@ -374,16 +417,30 @@ button:focus-visible {
   border-top-color: var(--p2);
 }
 
+.staging-row--top {
+  --active-color: var(--p2);
+}
+
 .staging-row--bottom .staging-cell {
   border-bottom-color: var(--p1);
+}
+
+.staging-row--bottom {
+  --active-color: var(--p1);
 }
 
 .staging-cell:disabled {
   cursor: default;
 }
 
-.staging-cell[data-status="ready"] {
+.staging-cell[data-status="ready"],
+.staging-cell[data-status="locked"] {
   background: repeating-linear-gradient(135deg, #162b3d 0 7px, #102435 7px 14px);
+}
+
+.staging-cell[data-status="locked"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--active-color, var(--line)) 55%, var(--line));
 }
 
 .staging-cell[data-status="blocked"] {
@@ -589,3 +646,4 @@ button:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
