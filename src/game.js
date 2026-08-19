@@ -7,20 +7,20 @@ export const PIECE_TYPES = Object.freeze({
   tank: {
     name: "Tank",
     short: "T",
-    maxHp: 5,
+    maxHp: 10,
     description: "2 damage directly ahead",
   },
   dps: {
     name: "Arc",
     short: "A",
-    maxHp: 3,
-    description: "1 damage across the 3 tiles ahead",
+    maxHp: 5,
+    description: "2 damage across the 3 tiles ahead",
   },
   ranged: {
     name: "Ranger",
     short: "R",
-    maxHp: 2,
-    description: "2 damage exactly 2 tiles ahead",
+    maxHp: 5,
+    description: "1 damage ahead and 3 damage two tiles ahead",
   },
   healer: {
     name: "Healer",
@@ -76,7 +76,11 @@ function copyState(state) {
 
 export function queuePiece(state, playerId, column, type) {
   if (state.winner || state.players[playerId]?.ready) return state;
-  if (!PIECE_TYPES[type] || !isColumn(column) || isColumnFull(state, column)) return state;
+  if (
+    !PIECE_TYPES[type] ||
+    !isColumn(column) ||
+    isStagingColumnBlocked(state, playerId, column)
+  ) return state;
 
   const next = copyState(state);
   const staging = next.players[playerId].staging;
@@ -116,7 +120,7 @@ export function randomizeStaging(state, playerId, random = Math.random) {
   }
 
   for (let column = 0; column < BOARD_SIZE; column += 1) {
-    if (staging[column] || isColumnFull(next, column)) continue;
+    if (staging[column] || isStagingColumnBlocked(next, playerId, column)) continue;
     const availableTypes = Object.keys(PIECE_TYPES).filter(
       (type) => counts[type] < MAX_PER_TYPE,
     );
@@ -160,10 +164,22 @@ export function isColumnFull(state, column) {
   return state.board.every((row) => Boolean(row[column]));
 }
 
+export function isStagingColumnBlocked(state, playerId, column) {
+  if (!state.players[playerId] || !isColumn(column)) return true;
+  const entryRow = playerId === "p1" ? BOARD_SIZE - 1 : 0;
+  if (!state.board[entryRow][column]) return false;
+
+  const preview = copyState(state);
+  const abilityResult = resolveAbilities(preview);
+  const followThrough = followThroughDefeats(preview, abilityResult.defeats);
+  advanceUnitsSimultaneously(preview, followThrough.movedUnitIds);
+  return Boolean(preview.board[entryRow][column]);
+}
+
 export function requiredStagingSlots(state, playerId) {
   return state.players[playerId].staging.reduce(
     (remaining, slot, column) =>
-      remaining + (!slot && !isColumnFull(state, column) ? 1 : 0),
+      remaining + (!slot && !isStagingColumnBlocked(state, playerId, column) ? 1 : 0),
     0,
   );
 }
@@ -250,19 +266,15 @@ function deployReadyUnits(state, playerId) {
 }
 
 function resolveAbilities(state) {
-  const effects = new Map();
+  const damageEffects = new Map();
 
   forEachUnit(state.board, (unit, row, column) => {
     for (const target of targetsFor(unit, row, column)) {
+      if (target.kind !== "damage") continue;
       if (!isOnBoard(target.row, target.column)) continue;
       const targetUnit = state.board[target.row][target.column];
-      if (!targetUnit) continue;
-
-      if (target.kind === "heal" && targetUnit.owner === unit.owner) {
-        addEffect(effects, targetUnit.id, 0, target.amount);
-      }
-      if (target.kind === "damage" && targetUnit.owner !== unit.owner) {
-        addEffect(effects, targetUnit.id, target.amount, 0, {
+      if (targetUnit && targetUnit.owner !== unit.owner) {
+        addEffect(damageEffects, targetUnit.id, target.amount, 0, {
           id: unit.id,
           owner: unit.owner,
           row,
@@ -278,13 +290,10 @@ function resolveAbilities(state) {
   const defeats = [];
 
   forEachUnit(state.board, (unit, row, column) => {
-    const effect = effects.get(unit.id);
+    const effect = damageEffects.get(unit.id);
     if (!effect) return;
-    const maxHp = PIECE_TYPES[unit.type].maxHp;
-    const healedHp = Math.min(maxHp, unit.hp + effect.healing);
-    healing += healedHp - unit.hp;
-    const finalHp = healedHp - effect.damage;
-    damage += Math.min(healedHp, effect.damage);
+    const finalHp = unit.hp - effect.damage;
+    damage += Math.min(unit.hp, effect.damage);
     if (finalHp <= 0) {
       defeats.push({
         unit: { ...unit },
@@ -297,6 +306,27 @@ function resolveAbilities(state) {
     } else {
       unit.hp = finalHp;
     }
+  });
+
+  const healingEffects = new Map();
+  forEachUnit(state.board, (unit, row, column) => {
+    if (unit.type !== "healer") return;
+    for (const target of targetsFor(unit, row, column)) {
+      if (target.kind !== "heal" || !isOnBoard(target.row, target.column)) continue;
+      const targetUnit = state.board[target.row][target.column];
+      if (targetUnit && targetUnit.id !== unit.id && targetUnit.owner === unit.owner) {
+        addEffect(healingEffects, targetUnit.id, 0, target.amount);
+      }
+    }
+  });
+
+  forEachUnit(state.board, (unit) => {
+    const effect = healingEffects.get(unit.id);
+    if (!effect) return;
+    const maxHp = PIECE_TYPES[unit.type].maxHp;
+    const healedHp = Math.min(maxHp, unit.hp + effect.healing);
+    healing += healedHp - unit.hp;
+    unit.hp = healedHp;
   });
 
   return { damage, healing, defeated, defeats };
@@ -344,27 +374,63 @@ function followThroughDefeats(state, defeats) {
 
 function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
   const snapshot = state.board.map((row) => row.slice());
-  const exits = [];
-  const intents = [];
-  const targetCounts = new Map();
+  const positions = new Map();
+  const emptyTargetOwners = new Map();
 
   snapshot.forEach((row, rowIndex) => {
     row.forEach((unit, column) => {
-      if (!unit || alreadyMoved.has(unit.id)) return;
+      if (!unit) return;
+      positions.set(unit.id, { row: rowIndex, column });
+      if (alreadyMoved.has(unit.id)) return;
       const step = unit.owner === "p1" ? -1 : 1;
       const targetRow = rowIndex + step;
-      if (targetRow < 0 || targetRow >= BOARD_SIZE) {
-        exits.push({ unit, row: rowIndex, column });
-        return;
-      }
-      if (snapshot[targetRow][column]) return;
+      if (!isOnBoard(targetRow, column) || snapshot[targetRow][column]) return;
       const key = `${targetRow}:${column}`;
-      intents.push({ unit, row: rowIndex, column, targetRow, key });
-      targetCounts.set(key, (targetCounts.get(key) ?? 0) + 1);
+      const owners = emptyTargetOwners.get(key) ?? new Set();
+      owners.add(unit.owner);
+      emptyTargetOwners.set(key, owners);
     });
   });
 
-  const successfulMoves = intents.filter((intent) => targetCounts.get(intent.key) === 1);
+  const initiativeOwner = state.round % 2 === 1 ? "p1" : "p2";
+  const memo = new Map();
+  const canMove = (unit) => {
+    if (memo.has(unit.id)) return memo.get(unit.id);
+    if (alreadyMoved.has(unit.id)) return false;
+
+    const { row, column } = positions.get(unit.id);
+    const step = unit.owner === "p1" ? -1 : 1;
+    const targetRow = row + step;
+    if (!isOnBoard(targetRow, column)) {
+      memo.set(unit.id, true);
+      return true;
+    }
+
+    const occupant = snapshot[targetRow][column];
+    if (occupant) {
+      const result = occupant.owner === unit.owner && canMove(occupant);
+      memo.set(unit.id, result);
+      return result;
+    }
+
+    const owners = emptyTargetOwners.get(`${targetRow}:${column}`);
+    const result = owners?.size !== 2 || unit.owner === initiativeOwner;
+    memo.set(unit.id, result);
+    return result;
+  };
+
+  const exits = [];
+  const successfulMoves = [];
+  snapshot.forEach((row, rowIndex) => {
+    row.forEach((unit, column) => {
+      if (!unit || !canMove(unit)) return;
+      const step = unit.owner === "p1" ? -1 : 1;
+      const targetRow = rowIndex + step;
+      if (!isOnBoard(targetRow, column)) exits.push({ unit, row: rowIndex, column });
+      else successfulMoves.push({ unit, row: rowIndex, column, targetRow });
+    });
+  });
+
   for (const exit of exits) {
     state.board[exit.row][exit.column] = null;
     state.players[exit.unit.owner].score += 1;
@@ -374,6 +440,7 @@ function advanceUnitsSimultaneously(state, alreadyMoved = new Set()) {
 
   return {
     moved: successfulMoves.length,
+    initiativeOwner,
     scored: {
       p1: exits.filter((exit) => exit.unit.owner === "p1").length,
       p2: exits.filter((exit) => exit.unit.owner === "p2").length,
@@ -391,11 +458,14 @@ function targetsFor(unit, row, column) {
       row: row + step,
       column: column + offset,
       kind: "damage",
-      amount: 1,
+      amount: 2,
     }));
   }
   if (unit.type === "ranged") {
-    return [{ row: row + step * 2, column, kind: "damage", amount: 2 }];
+    return [
+      { row: row + step, column, kind: "damage", amount: 1 },
+      { row: row + step * 2, column, kind: "damage", amount: 3 },
+    ];
   }
   return [-1, 0, 1]
     .flatMap((rowOffset) =>
