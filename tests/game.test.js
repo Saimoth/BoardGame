@@ -6,6 +6,7 @@ import {
   canReadyPlayer,
   createInitialState,
   isColumnFull,
+  isStagingColumnBlocked,
   queuePiece,
   randomizeStaging,
   readyPlayer,
@@ -103,6 +104,19 @@ test("a completely full column is skipped by random placement and counts as sati
   assert.equal(canReadyPlayer(state, "p1"), true);
 });
 
+test("a full column remains draftable when its entry will open next round", () => {
+  let state = createInitialState();
+  for (let row = 0; row < 6; row += 1) {
+    state.board[row][0] = unit(row + 1, "p1", "healer");
+  }
+  state.nextUnitId = 7;
+
+  assert.equal(isColumnFull(state, 0), true);
+  assert.equal(isStagingColumnBlocked(state, "p1", 0), false);
+  state = queuePiece(state, "p1", 0, "tank");
+  assert.equal(state.players.p1.staging[0].type, "tank");
+});
+
 test("both staged rows deploy for the following round", () => {
   const state = resolveRound(createInitialState());
 
@@ -121,9 +135,9 @@ test("directly opposing tanks damage simultaneously and remain blocked", () => {
   state = resolveRound(state);
 
   assert.equal(state.board[3][2].owner, "p1");
-  assert.equal(state.board[3][2].hp, 3);
+  assert.equal(state.board[3][2].hp, 8);
   assert.equal(state.board[2][2].owner, "p2");
-  assert.equal(state.board[2][2].hp, 3);
+  assert.equal(state.board[2][2].hp, 8);
 });
 
 test("a direct killer takes the defeated square and pulls its friendly column forward", () => {
@@ -151,16 +165,27 @@ test("a ranged kill does not teleport the attacker into the defeated square", ()
   assert.equal(state.board[3][3].id, 2);
 });
 
-test("opposing units contesting the same empty square both hold position", () => {
+test("odd-round initiative closes a contested one-square gap for Player 1", () => {
   let state = createInitialState();
   state.board[4][1] = unit(1, "p1", "healer");
   state.board[2][1] = unit(2, "p2", "healer");
   state.nextUnitId = 3;
   state = resolveRound(state);
 
-  assert.equal(state.board[4][1].owner, "p1");
-  assert.equal(state.board[3][1], null);
+  assert.equal(state.board[3][1].owner, "p1");
   assert.equal(state.board[2][1].owner, "p2");
+});
+
+test("even-round initiative closes a contested one-square gap for Player 2", () => {
+  let state = createInitialState();
+  state.round = 2;
+  state.board[4][1] = unit(1, "p1", "healer");
+  state.board[2][1] = unit(2, "p2", "healer");
+  state.nextUnitId = 3;
+  state = resolveRound(state);
+
+  assert.equal(state.board[4][1].owner, "p1");
+  assert.equal(state.board[3][1].owner, "p2");
 });
 
 test("ranged damage and opposing movement use the same starting board", () => {
@@ -170,10 +195,9 @@ test("ranged damage and opposing movement use the same starting board", () => {
   state.nextUnitId = 3;
   state = resolveRound(state);
 
-  assert.equal(state.board[4][1].type, "ranged");
+  assert.equal(state.board[3][1].type, "ranged");
   assert.equal(state.board[2][1].type, "tank");
-  assert.equal(state.board[2][1].hp, 3);
-  assert.equal(state.board[3][1], null);
+  assert.equal(state.board[2][1].hp, 7);
 });
 
 test("healing resolves before simultaneous movement", () => {
@@ -185,7 +209,74 @@ test("healing resolves before simultaneous movement", () => {
 
   assert.equal(state.board[2][2].type, "tank");
   assert.equal(state.board[2][2].hp, 4);
-  assert.equal(state.board[4][2].type, "healer");
+  assert.equal(state.board[3][2].type, "healer");
+});
+
+test("lethal damage removes a unit before adjacent healing is applied", () => {
+  let state = createInitialState();
+  state.board[2][2] = unit(1, "p2", "tank");
+  state.board[3][2] = unit(2, "p1", "tank", 1);
+  state.board[4][1] = unit(3, "p1", "healer");
+  state.nextUnitId = 4;
+  state = resolveRound(state);
+
+  assert.equal(state.board[3][2].owner, "p2");
+  assert.equal(state.board[3][2].id, 1);
+});
+
+test("a healer defeated during damage cannot heal another friendly unit", () => {
+  let state = createInitialState();
+  state.board[2][1] = unit(1, "p2", "tank");
+  state.board[3][1] = unit(2, "p1", "healer", 1);
+  state.board[4][1] = unit(3, "p1", "tank", 1);
+  state.nextUnitId = 4;
+  state = resolveRound(state);
+
+  assert.equal(state.board[4][1].id, 3);
+  assert.equal(state.board[4][1].hp, 1);
+});
+
+test("a healer cannot heal itself", () => {
+  let state = createInitialState();
+  state.board[4][4] = unit(1, "p1", "healer", 2);
+  state.nextUnitId = 2;
+  state = resolveRound(state);
+
+  assert.equal(state.board[3][4].hp, 2);
+});
+
+test("Arc deals 2 damage to forward-left, forward, and forward-right", () => {
+  let state = createInitialState();
+  state.board[3][2] = unit(1, "p1", "dps");
+  state.board[2][1] = unit(2, "p2", "tank");
+  state.board[2][2] = unit(3, "p2", "tank");
+  state.board[2][3] = unit(4, "p2", "tank");
+  state.nextUnitId = 5;
+  state = resolveRound(state);
+
+  for (const id of [2, 3, 4]) {
+    const target = state.board.flat().find((piece) => piece?.id === id);
+    assert.equal(target.hp, 8);
+  }
+});
+
+test("Ranger deals 1 damage ahead and 3 damage two tiles ahead", () => {
+  let state = createInitialState();
+  state.board[4][2] = unit(1, "p1", "ranged");
+  state.board[3][2] = unit(2, "p2", "tank");
+  state.board[2][2] = unit(3, "p2", "tank");
+  state.nextUnitId = 4;
+  state = resolveRound(state);
+
+  assert.equal(state.board[3][2].hp, 9);
+  assert.equal(state.board[2][2].hp, 7);
+});
+
+test("unit health values match the revised balance", () => {
+  assert.equal(PIECE_TYPES.tank.maxHp, 10);
+  assert.equal(PIECE_TYPES.dps.maxHp, 5);
+  assert.equal(PIECE_TYPES.ranged.maxHp, 5);
+  assert.equal(PIECE_TYPES.healer.maxHp, 3);
 });
 
 test("simultaneous fifth breakthroughs produce a draw", () => {
